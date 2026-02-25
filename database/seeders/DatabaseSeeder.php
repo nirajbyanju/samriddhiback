@@ -3,8 +3,10 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use DeepCopy\f013\C;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str; // <-- Import Str
 
 class DatabaseSeeder extends Seeder
 {
@@ -17,9 +19,28 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $this->call([
+            PermissionMatrixSeeder::class,
+
+            ConstructionStatusSeeder::class,
+            FurnishingSeeder::class,
+            HouseDetailSeeder::class,
+            HouseTypeSeeder::class,
+            ListingTypeSeeder::class,
+            NepalLocationSeeder::class,
+            PropertyFaceSeeder::class,
+            PropertyStatusSeeder::class,
+            PropertyTypeSeeder::class,
+            RoadConditionSeeder::class,
+            RoadTypeSeeder::class,
+            RoofTypeSeeder::class,
+            SewageTypeSeeder::class,
+            UnitSeeder::class,
+            WaterSourceSeeder::class,
+            MeasureUnitsSeeder::class,
+            PropertyCategorySeeder::class,
+
+
         ]);
     }
 }
