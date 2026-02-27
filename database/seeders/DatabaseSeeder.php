@@ -39,6 +39,8 @@ class DatabaseSeeder extends Seeder
             WaterSourceSeeder::class,
             MeasureUnitsSeeder::class,
             PropertyCategorySeeder::class,
+            ParkingTypeSeeder::class,
+
 
 
         ]);

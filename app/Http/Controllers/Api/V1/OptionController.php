@@ -173,6 +173,28 @@ class OptionController extends BaseController
                 'update' => ['name' => 'sometimes|required|string|max:255']
             ]
         ],
+        'furnishing' => [
+            'model' => \App\Models\Data\Furnishing::class,
+            'validation' => [
+                'store' => ['label' => 'required|string|max:255'],
+                'update' => ['label' => 'sometimes|required|string|max:255']
+            ]
+        ],
+        'constructionStatus' => [
+            'model' => \App\Models\Data\ConstructionStatus::class,
+            'validation' => [
+                'store' => ['label' => 'required|string|max:255'],
+                'update' => ['label' => 'sometimes|required|string|max:255']
+            ]
+        ],
+        'parkingType' => [
+            'model' => \App\Models\Data\ParkingType::class,
+            'validation' => [
+                'store' => ['label' => 'required|string|max:255'],
+                'update' => ['label' => 'sometimes|required|string|max:255']
+            ]
+        ],
+
     ];
 
     /**

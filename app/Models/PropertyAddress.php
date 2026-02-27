@@ -15,10 +15,10 @@ class PropertyAddress extends Model
 
     protected $fillable = [
         'property_id',
-        'province',
-        'district',
-        'municipality',
-        'ward',
+        'province_id',
+        'district_id',
+        'municipality_id',
+        'ward_id',
         'area',
         'postal_code',
         'full_address',

@@ -28,8 +28,8 @@ return new class extends Migration
             $table->float('total_floors')->nullable();
             $table->json('floor_details')->nullable();
 
-            $table->year('year_built')->nullable();
-            $table->year('year_renovated')->nullable();
+            $table->string('year_built')->nullable();
+            $table->string('year_renovated')->nullable();
 
             $table->unsignedBigInteger('construction_status')->nullable();
             $table->json('construction_status_details')->nullable();

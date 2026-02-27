@@ -50,7 +50,7 @@ class HouseDetail extends Model
         'reserved_tank',
         'parking_cars',
         'parking_bikes',
-        'parking_type',
+        'parking_type_id',
         'parking_area',
         'parking_area_unit_id',
         'amenities',
@@ -188,7 +188,7 @@ class HouseDetail extends Model
      */
     public function scopeParkingType($query, $type)
     {
-        return $query->where('parking_type', $type);
+        return $query->where('parking_type_id', $type);
     }
 
     /**

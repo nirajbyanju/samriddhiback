@@ -15,10 +15,10 @@ return new class extends Migration
             $table->id();
             $table->foreignId('property_id')->unique()->constrained()->cascadeOnDelete();
 
-            $table->string('province')->nullable();
-            $table->string('district')->nullable();
-            $table->string('municipality')->nullable();
-            $table->string('ward')->nullable();
+            $table->string('province_id')->nullable();
+            $table->string('district_id')->nullable();
+            $table->string('municipality_id')->nullable();
+            $table->string('ward_id')->nullable();
             $table->string('area')->nullable();
             $table->string('postal_code')->nullable();
 

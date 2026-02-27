@@ -423,7 +423,7 @@ class PropertyStoreService
             'reserved_tank',
             'parking_cars',
             'parking_bikes',
-            'parking_type',
+            'parking_type_id',
             'parking_area',
             'parking_area_unit_id',
             'amenities',
@@ -489,10 +489,10 @@ class PropertyStoreService
     protected function extractAddressData(array $data): array
     {
         $addressFields = [
-            'province',
-            'district',
-            'municipality',
-            'ward',
+            'province_id',
+            'district_id',
+            'municipality_id',
+            'ward_id',
             'area',
             'postal_code',
             'full_address',
@@ -511,7 +511,7 @@ class PropertyStoreService
      */
     protected function hasAddressData(array $data): bool
     {
-        $addressFields = ['province', 'district', 'municipality', 'ward', 'area', 'postal_code'];
+        $addressFields = ['province_id', 'district_id', 'municipality_id', 'ward_id', 'area', 'postal_code'];
 
         foreach ($addressFields as $field) {
             if (!empty($data[$field])) {
@@ -555,10 +555,10 @@ class PropertyStoreService
         $parts = [];
 
         if (!empty($addressData['area'])) $parts[] = $addressData['area'];
-        if (!empty($addressData['ward'])) $parts[] = 'Ward ' . $addressData['ward'];
-        if (!empty($addressData['municipality'])) $parts[] = $addressData['municipality'];
-        if (!empty($addressData['district'])) $parts[] = $addressData['district'];
-        if (!empty($addressData['province'])) $parts[] = $addressData['province'];
+        if (!empty($addressData['ward_id'])) $parts[] = 'Ward ' . $addressData['ward_id'];
+        if (!empty($addressData['municipality_id'])) $parts[] = $addressData['municipality_id'];
+        if (!empty($addressData['district_id'])) $parts[] = $addressData['district_id'];
+        if (!empty($addressData['province_id'])) $parts[] = $addressData['province_id'];
 
         return implode(', ', $parts);
     }
@@ -618,7 +618,7 @@ public function listActiveProperty($request)
         ->filter(); // remove empty values
 
     // Base Query
-    $query = Property::query()
+    $query = Property::with(['houseDetails','landUnit','propertyFace','propertyType','listingType','measureUnit','roadType','roadCondition','waterSource','sewageType','propertyStatus','createdBy','updatedBy','verifiedBy'])
         
     ;
 

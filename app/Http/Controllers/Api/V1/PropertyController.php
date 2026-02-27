@@ -103,4 +103,12 @@ class PropertyController extends BaseController  implements HasMiddleware
         Property::destroy($id);
         return response()->json(['message' => 'Deleted']);
     }
+
+    public function updateStatus($id, $request)
+    {
+        $property = Property::findOrFail($id);
+        $property->status = $request->get('status');
+        $property->save();
+        return $property;
+    }
 }
