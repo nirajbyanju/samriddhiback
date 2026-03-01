@@ -9,8 +9,13 @@ use App\Http\Controllers\Api\V1\PermissionMatrixController;
 use App\Http\Controllers\Api\V1\EmployeePermissionController;
 use App\Http\Controllers\Api\V1\OptionController;
 use Illuminate\Container\Attributes\Auth;
+use App\Http\Controllers\Api\V1\FrontController;
 
 Route::prefix('v1')->group(function () {
+
+    Route::get('/property-summary', [FrontController::class, 'propertySummary']);
+    Route::get('/property-details/{slug}', [FrontController::class, 'propertyDetail']);
+
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
     Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
@@ -21,7 +26,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/', [PropertyController::class, 'store']);
         Route::get('/{property}', [PropertyController::class, 'show']);
         Route::put('/{property}', [PropertyController::class, 'update']);
-        Route::delete('/{property}', [PropertyController::class, 'destroy']);
+        Route::delete('/{id}', [PropertyController::class, 'destroy']);
         Route::patch('/status/{id}', [PropertyController::class, 'updateStatus']);
     });
 
@@ -75,3 +80,4 @@ Route::prefix('v1')->group(function () {
         });
     });
 });
+

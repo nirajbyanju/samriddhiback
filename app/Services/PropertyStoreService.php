@@ -582,7 +582,7 @@ class PropertyStoreService
             $newNumber = '0001';
         }
 
-        return "PROP-{$year}{$month}-{$newNumber}";
+        return "SRE{$year}-{$newNumber}";
     }
 
 public function listActiveProperty($request)

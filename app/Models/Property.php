@@ -240,6 +240,15 @@ class Property extends Model
         return $this->hasOne(HouseDetail::class, 'property_id');
     }
 
+    public function images()
+    {
+        return $this->hasMany(PropertyImages::class, 'property_id');
+    }
+
+    public function address(){
+        return $this->hasOne(PropertyAddress::class);
+    }
+
     /**
      * Get the user who created this property.
      */
