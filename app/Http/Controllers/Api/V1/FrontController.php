@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Api\V1\BaseController;
 use Illuminate\Http\Request;
 use App\Models\Property;
-use App\Http\Resources\PropertyFrontResource;
+use App\Http\Resources\PropertyFrontResources;
 use App\Http\Resources\PropertyDetailResource;
 
 class FrontController extends BaseController
@@ -44,7 +44,7 @@ class FrontController extends BaseController
             return response()->json([
                 'status' => true,
                 'message' => 'List of properties',
-                'data' => PropertyFrontResource::collection($paginatedResults->getCollection()),
+                'data' => PropertyFrontResources::collection($paginatedResults->getCollection()),
                 'pagination' => [
                     'total' => $paginatedResults->total(),
                     'per_page' => $paginatedResults->perPage(),
