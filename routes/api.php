@@ -25,7 +25,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/', [PropertyController::class, 'index']);
         Route::post('/', [PropertyController::class, 'store']);
         Route::get('/{property}', [PropertyController::class, 'show']);
-        Route::put('/{property}', [PropertyController::class, 'update']);
+        Route::post('/{property}', [PropertyController::class, 'update']);
         Route::delete('/{id}', [PropertyController::class, 'destroy']);
         Route::patch('/status/{id}', [PropertyController::class, 'updateStatus']);
     });
