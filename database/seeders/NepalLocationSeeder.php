@@ -4,10 +4,10 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use App\Models\data\Province;
-use App\Models\data\District;
-use App\Models\data\Municipality;
-use App\Models\data\Ward;
+use App\Models\Data\Province;
+use App\Models\Data\District;
+use App\Models\Data\Municipality;
+use App\Models\Data\Ward;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -20,6 +20,7 @@ class NepalLocationSeeder extends Seeder
     {
         // Disable foreign key checks
         DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        
         
         // Clear existing data
         Ward::truncate();
