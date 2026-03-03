@@ -566,24 +566,23 @@ class PropertyStoreService
     /**
      * Generate unique property code
      */
-    protected function generatePropertyCode(): string
-    {
-        $year = date('Y');
-        $month = date('m');
-        $lastProperty = Property::whereYear('created_at', $year)
-            ->whereMonth('created_at', $month)
-            ->orderBy('id', 'desc')
-            ->first();
+protected function generatePropertyCode(): string
+{
+    $year = date('Y');
 
-        if ($lastProperty) {
-            $lastNumber = intval(substr($lastProperty->property_code, -4));
-            $newNumber = str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
-        } else {
-            $newNumber = '0001';
-        }
+    $lastProperty = Property::where('property_code', 'like', "SRE{$year}-%")
+        ->orderBy('property_code', 'desc')
+        ->first();
 
-        return "SRE{$year}-{$newNumber}";
+    if ($lastProperty) {
+        $lastNumber = (int) substr($lastProperty->property_code, -4);
+        $newNumber = str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
+    } else {
+        $newNumber = '0001';
     }
+
+    return "SRE{$year}-{$newNumber}";
+}
 
 public function listActiveProperty($request)
 {

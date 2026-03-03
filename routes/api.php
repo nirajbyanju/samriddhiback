@@ -15,6 +15,7 @@ Route::prefix('v1')->group(function () {
 
     Route::get('/property-summary', [FrontController::class, 'propertySummary']);
     Route::get('/property-details/{slug}', [FrontController::class, 'propertyDetail']);
+    Route::get('/property-list', [FrontController::class, 'propertyList']);
 
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
@@ -62,7 +63,6 @@ Route::prefix('v1')->group(function () {
             Route::get('/role/{roleId}/employees', [EmployeePermissionController::class, 'getEmployeesByRole']);
         });
 
-        Route::middleware('auth:sanctum')->group(function () {
             Route::get('/options', [OptionController::class, 'fetchOption']);
             Route::post('/options', [OptionController::class, 'store']);
             Route::get('/options/{id}', [OptionController::class, 'getOptionById']);
@@ -76,8 +76,9 @@ Route::prefix('v1')->group(function () {
             Route::get('get-dropdown/{slug}/{module?}', [OptionController::class, 'getDropdownOptions']);
 
             // fetch all options
-            Route::get('get-all-options', [OptionController::class, 'getAllOptions']);
-        });
+           
     });
+
+     Route::get('get-all-options', [OptionController::class, 'getAllOptions']);
 });
 
