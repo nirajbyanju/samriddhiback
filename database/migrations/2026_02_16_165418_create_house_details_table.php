@@ -18,8 +18,8 @@ return new class extends Migration
             | Keep as unsignedBigInteger, no foreign key
             */
             $table->unsignedBigInteger('property_id')->nullable()->unique();
-            $table->unsignedBigInteger('furnishing_id')->nullable()->unique();
-            $table->unsignedBigInteger('house_type_id')->nullable()->unique();
+            $table->unsignedBigInteger('furnishing_id')->nullable();
+            $table->unsignedBigInteger('house_type_id')->nullable();
 
             $table->string('built_area')->nullable(); // Total property area
             $table->unsignedBigInteger('built_area_unit_id')->nullable(); // Total property area unit
