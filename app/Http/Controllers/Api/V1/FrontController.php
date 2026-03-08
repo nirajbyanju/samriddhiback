@@ -85,7 +85,7 @@ class FrontController extends BaseController
                 return response()->json([
                     'status' => true,
                     'message' => 'Property found',
-                    'data' => new PropertyDetailResource($property),
+                    'data' => $property,
                 ], 200);
 
         } catch (\Exception $e) {

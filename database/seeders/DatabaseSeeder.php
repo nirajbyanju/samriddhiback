@@ -40,6 +40,7 @@ class DatabaseSeeder extends Seeder
             MeasureUnitsSeeder::class,
             PropertyCategorySeeder::class,
             ParkingTypeSeeder::class,
+            AmenitiesSeeder::class,
 
 
 

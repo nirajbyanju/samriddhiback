@@ -48,15 +48,14 @@ class PropertyStoreService
             }
 
             // Handle nearby places if provided
-            // if (isset($data['nearby_places']) && is_array($data['nearby_places'])) {
-            //     $this->attachNearbyPlaces($property, $data['nearby_places']);
-            // }
+            if (isset($data['nearby_places']) && is_array($data['nearby_places'])) {
+                $this->attachNearbyPlaces($property, $data['nearby_places']);
+            }
 
             return $property->load([
-                // 'address', 
-                // 'images', 
-                // 'features', 
-                // 'nearbyPlaces',
+                 'address', 
+                 'images', 
+                 'nearbyPlaces',
                 'houseDetails',
                 'houseDetails.furnishing',
                 'houseDetails.houseType',
@@ -139,7 +138,7 @@ class PropertyStoreService
 
         // Generate slug if not provided
         if (empty($propertyData['slug']) && !empty($propertyData['title'])) {
-            $propertyData['slug'] = Str::slug($propertyData['title']);
+            $propertyData['slug'] = Str::slug($propertyData['title'] . '-' . $propertyData['property_code']);
         }
 
         // Handle tags as JSON if it's an array
@@ -172,8 +171,8 @@ class PropertyStoreService
         }
 
         // Process construction status details if provided
-        if (isset($houseData['construction_status_details']) && is_array($houseData['construction_status_details'])) {
-            $houseData['construction_status_details'] = json_encode($houseData['construction_status_details']);
+        if (isset($houseData['construction_status']) && is_array($houseData['construction_status'])) {
+            $houseData['construction_status'] = json_encode($houseData['construction_status']);
         }
 
         // Process amenities if provided
@@ -421,6 +420,7 @@ class PropertyStoreService
             'construction_status_details',
             'roof_type_id',
             'reserved_tank',
+            'tank_area',
             'parking_cars',
             'parking_bikes',
             'parking_type_id',
@@ -474,7 +474,8 @@ class PropertyStoreService
             'seo_title',
             'seo_description',
             'property_status_id',
-            'status'
+            'status',
+            'video_url',
         ];
 
         return array_filter(
@@ -566,73 +567,71 @@ class PropertyStoreService
     /**
      * Generate unique property code
      */
-protected function generatePropertyCode(): string
-{
-    $year = date('Y');
+    protected function generatePropertyCode(): string
+    {
+        $year = date('Y');
 
-    $lastProperty = Property::where('property_code', 'like', "SRE{$year}-%")
-        ->orderBy('property_code', 'desc')
-        ->first();
+        $lastProperty = Property::where('property_code', 'like', "SRE{$year}-%")
+            ->orderBy('property_code', 'desc')
+            ->first();
 
-    if ($lastProperty) {
-        $lastNumber = (int) substr($lastProperty->property_code, -4);
-        $newNumber = str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
-    } else {
-        $newNumber = '0001';
-    }
-
-    return "SRE{$year}-{$newNumber}";
-}
-
-public function listActiveProperty($request)
-{
-    $userId = Auth::id();
-  
-    // Sorting
-    $orderBy = in_array(strtoupper($request->get('order_by')), ['ASC', 'DESC'])
-        ? strtoupper($request->get('order_by'))
-        : 'DESC';
-
-    $orderColumn = $request->get('order_column') ?? 'created_at';
-    $orderColumn = Str::snake($orderColumn);
-
-    // Pagination
-    $limit = $request->get('limit');
-    if (empty($limit) || $limit == 0) {
-        $limit = $request->header('X-Limit-No') ?? 10;
-    }
-
-    $limit = is_numeric($limit) ? (int) $limit : 10;
-    $page  = is_numeric($request->get('page')) ? (int) $request->get('page') : 1;
-
-    // Allowed DB filters (snake_case)
-    $allowedFilters = ['category_id', 'vacancy_type', 'is_status', 'title'];
-
-    // Convert request inputs to snake_case
-    $filters = collect($request->all())
-        ->mapWithKeys(function ($value, $key) {
-            return [Str::snake($key) => $value];
-        })
-        ->only($allowedFilters)
-        ->filter(); // remove empty values
-
-    // Base Query
-    $query = Property::with(['houseDetails','landUnit','propertyFace','propertyType','listingType','measureUnit','roadType','roadCondition','waterSource','sewageType','propertyStatus','createdBy','updatedBy','verifiedBy'])
-        
-    ;
-
-    // Apply Filters
-    foreach ($filters as $field => $value) {
-        if ($field === 'title') {
-            $query->where($field, 'like', "%{$value}%");
+        if ($lastProperty) {
+            $lastNumber = (int) substr($lastProperty->property_code, -4);
+            $newNumber = str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
         } else {
-            $query->where($field, $value);
+            $newNumber = '0001';
         }
+
+        return "SRE{$year}-{$newNumber}";
     }
 
-    // Apply Ordering
-    $query->orderBy($orderColumn, $orderBy);
+    public function listActiveProperty($request)
+    {
+        $userId = Auth::id();
 
-    return $query->paginate($limit, ['*'], 'page', $page);
-}
+        // Sorting
+        $orderBy = in_array(strtoupper($request->get('order_by')), ['ASC', 'DESC'])
+            ? strtoupper($request->get('order_by'))
+            : 'DESC';
+
+        $orderColumn = $request->get('order_column') ?? 'created_at';
+        $orderColumn = Str::snake($orderColumn);
+
+        // Pagination
+        $limit = $request->get('limit');
+        if (empty($limit) || $limit == 0) {
+            $limit = $request->header('X-Limit-No') ?? 10;
+        }
+
+        $limit = is_numeric($limit) ? (int) $limit : 10;
+        $page  = is_numeric($request->get('page')) ? (int) $request->get('page') : 1;
+
+        // Allowed DB filters (snake_case)
+        $allowedFilters = ['category_id', 'vacancy_type', 'is_status', 'title'];
+
+        // Convert request inputs to snake_case
+        $filters = collect($request->all())
+            ->mapWithKeys(function ($value, $key) {
+                return [Str::snake($key) => $value];
+            })
+            ->only($allowedFilters)
+            ->filter(); // remove empty values
+
+        // Base Query
+        $query = Property::with(['houseDetails','address','nearbyPlaces','images', 'landUnit', 'propertyFace', 'propertyType', 'listingType', 'measureUnit', 'roadType', 'roadCondition', 'waterSource', 'sewageType', 'propertyStatus', 'createdBy', 'updatedBy', 'verifiedBy']);
+
+        // Apply Filters
+        foreach ($filters as $field => $value) {
+            if ($field === 'title') {
+                $query->where($field, 'like', "%{$value}%");
+            } else {
+                $query->where($field, $value);
+            }
+        }
+
+        // Apply Ordering
+        $query->orderBy($orderColumn, $orderBy);
+
+        return $query->paginate($limit, ['*'], 'page', $page);
+    }
 }

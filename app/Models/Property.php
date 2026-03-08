@@ -48,6 +48,7 @@ class Property extends Model
         'property_face_id',
         'property_type_id',
         'listing_type_id',
+        'video_url',
         'property_category_id',
         'length',
         'height',
@@ -70,6 +71,7 @@ class Property extends Model
         'seo_title',
         'seo_description',
         'property_status_id',
+        'nearby_places',
         'created_by',
         'updated_by',
         'verified_by',
@@ -83,7 +85,7 @@ class Property extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'land_area' => 'decimal:2',
+        'land_area' => 'string',
         'latitude' => 'decimal:8',
         'longitude' => 'decimal:8',
         'is_road_accessible' => 'boolean',
@@ -130,6 +132,10 @@ class Property extends Model
     /**
      * Generate unique property code.
      */
+    public function nearbyPlaces()
+    {
+        return $this->hasMany(PropertyNearbyPlace::class, 'property_id');
+    }
     public static function generatePropertyCode(): string
     {
         $year = date('Y');
@@ -148,6 +154,8 @@ class Property extends Model
 
         return "PROP-{$year}{$month}-{$newNumber}";
     }
+
+
 
 
     // ========== Relationships ==========
@@ -245,7 +253,8 @@ class Property extends Model
         return $this->hasMany(PropertyImages::class, 'property_id');
     }
 
-    public function address(){
+    public function address()
+    {
         return $this->hasOne(PropertyAddress::class);
     }
 
@@ -382,7 +391,7 @@ class Property extends Model
         if (!$this->land_area) {
             return 'N/A';
         }
-        
+
         $unit = $this->landUnit->symbol ?? 'sq ft';
         return number_format($this->land_area, 2) . ' ' . $unit;
     }
@@ -396,7 +405,7 @@ class Property extends Model
         if ($this->city) $parts[] = $this->city;
         if ($this->state) $parts[] = $this->state;
         if ($this->country) $parts[] = $this->country;
-        
+
         return implode(', ', $parts);
     }
 
@@ -416,7 +425,7 @@ class Property extends Model
         if (!$this->houseDetails || !$this->houseDetails->year_built) {
             return null;
         }
-        
+
         return date('Y') - $this->houseDetails->year_built;
     }
 }

@@ -49,7 +49,7 @@ class PropertyDetailResource extends JsonResource
                     return [
                         'id' => $image->id,
                         'image_url' => $image->image_url,
-                        'full_url' => asset('storage/' . $image->image_url),
+                        'full_url' => $image->image_url,
                         'image_type' => $image->image_type,
                         'is_featured' => $image->is_featured,
                         'sort_order' => $image->sort_order,
@@ -83,6 +83,7 @@ class PropertyDetailResource extends JsonResource
             'likes_count' => $this->likes_count,
             'seo_title' => $this->seo_title,
             'seo_description' => $this->seo_description,
+            'video_url' => $this->video_url,
            
         ];
     }

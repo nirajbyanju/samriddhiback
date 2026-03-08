@@ -36,6 +36,7 @@ return new class extends Migration
             $table->unsignedBigInteger('roof_type_id')->nullable();
 
             $table->string('reserved_tank')->nullable();
+            $table->string('tank_area')->nullable();
 
             $table->integer('parking_cars')->nullable();
             $table->integer('parking_bikes')->nullable();

@@ -48,6 +48,7 @@ class HouseDetail extends Model
         'construction_status_details',
         'roof_type_id',
         'reserved_tank',
+        'tank_area',
         'parking_cars',
         'parking_bikes',
         'parking_type_id',

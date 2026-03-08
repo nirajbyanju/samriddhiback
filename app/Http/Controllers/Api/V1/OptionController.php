@@ -194,6 +194,13 @@ class OptionController extends BaseController
                 'update' => ['label' => 'sometimes|required|string|max:255']
             ]
         ],
+        'amenities' => [
+            'model' => \App\Models\Data\Amenities::class,
+            'validation' => [
+                'store' => ['label' => 'required|string|max:255'],
+                'update' => ['label' => 'sometimes|required|string|max:255']
+            ]
+        ],
 
     ];
 

@@ -25,4 +25,10 @@ class PropertyImages extends Model
     {
         return $this->belongsTo(Property::class);
     }
+
+    // Replace image_url output
+    public function getImageUrlAttribute($value)
+    {
+        return $value ? asset('storage/' . $value) : null;
+    }
 }

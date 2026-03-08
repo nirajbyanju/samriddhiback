@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('slug')->unique();
             $table->string('tags');
             $table->longText('description')->nullable();
-            $table->decimal('land_area', 10, 2)->nullable();
+            $table->string('land_area')->nullable();
             $table->unsignedBigInteger('land_unit_id')->nullable();
             $table->unsignedBigInteger('property_face_id')->nullable();
             $table->unsignedBigInteger('property_type_id')->nullable();
