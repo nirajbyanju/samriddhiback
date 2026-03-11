@@ -41,6 +41,9 @@ class DatabaseSeeder extends Seeder
             PropertyCategorySeeder::class,
             ParkingTypeSeeder::class,
             AmenitiesSeeder::class,
+            ContactMethodSeeder::class,
+            FollowupStatusSeeder::class,
+            HouseMaterialsSeeder::class,
 
 
 

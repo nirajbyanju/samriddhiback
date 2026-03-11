@@ -8,20 +8,35 @@ use App\Http\Controllers\Api\V1\MenuController;
 use App\Http\Controllers\Api\V1\PermissionMatrixController;
 use App\Http\Controllers\Api\V1\EmployeePermissionController;
 use App\Http\Controllers\Api\V1\OptionController;
-use Illuminate\Container\Attributes\Auth;
 use App\Http\Controllers\Api\V1\FrontController;
+use App\Http\Controllers\Api\V1\InqueryController;
+use App\Http\Controllers\Api\V1\InqueryFollowupController;
+use App\Http\Controllers\Api\V1\FieldVisitsController;
 
 Route::prefix('v1')->group(function () {
 
+    // frontend routes
+
+    Route::post('/frontTour', [FieldVisitsController::class, 'frontTour']);
+   Route::post('/frontInquery', [InqueryController::class, 'frontInquery']);
+
     Route::get('/property-summary', [FrontController::class, 'propertySummary']);
     Route::get('/property-details/{slug}', [FrontController::class, 'propertyDetail']);
-    Route::get('/property-list', [FrontController::class, 'propertyList']);
+    Route::get('/property-list', [InqueryController::class, 'propertyList']);
+
+    //getinquery from frontend
+    Route::get('/get-inquery', [FrontController::class, 'getInquery']);
 
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
     Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
     Route::post('/refresh', [AuthController::class, 'refreshToken']);
 
+
+
+
+    Route::get('get-all-options', [OptionController::class, 'getAllOptions']);
+    // backend routes
     Route::prefix('properties')->controller(PropertyController::class)->group(function () {
         Route::get('/', [PropertyController::class, 'index']);
         Route::post('/', [PropertyController::class, 'store']);
@@ -63,22 +78,24 @@ Route::prefix('v1')->group(function () {
             Route::get('/role/{roleId}/employees', [EmployeePermissionController::class, 'getEmployeesByRole']);
         });
 
-            Route::get('/options', [OptionController::class, 'fetchOption']);
-            Route::post('/options', [OptionController::class, 'store']);
-            Route::get('/options/{id}', [OptionController::class, 'getOptionById']);
-            Route::put('/options/{id}', [OptionController::class, 'update']);
-            Route::delete('/options/{id}/{type}', [OptionController::class, 'destroy']);
-            Route::get('/showOptions', [OptionController::class, 'showOption']);
-            Route::patch('/options/status/{id}', [OptionController::class, 'updateStatus']);
-            Route::get('/optionMenu', [OptionController::class, 'optionMenu']);
+        Route::get('/options', [OptionController::class, 'fetchOption']);
+        Route::post('/options', [OptionController::class, 'store']);
+        Route::get('/options/{id}', [OptionController::class, 'getOptionById']);
+        Route::put('/options/{id}', [OptionController::class, 'update']);
+        Route::delete('/options/{id}/{type}', [OptionController::class, 'destroy']);
+        Route::get('/showOptions', [OptionController::class, 'showOption']);
+        Route::patch('/options/status/{id}', [OptionController::class, 'updateStatus']);
+        Route::get('/optionMenu', [OptionController::class, 'optionMenu']);
 
-            // fetch option dropdown
-            Route::get('get-dropdown/{slug}/{module?}', [OptionController::class, 'getDropdownOptions']);
+        // fetch option dropdown
+        Route::get('get-dropdown/{slug}/{module?}', [OptionController::class, 'getDropdownOptions']);
 
-            // fetch all options
-           
+        // fetch all options
     });
 
-     Route::get('get-all-options', [OptionController::class, 'getAllOptions']);
-});
+    //inquery routes
 
+    Route::apiResource('inqueries', InqueryController::class);
+    Route::apiResource('inquery-followups', InqueryFollowupController::class);
+
+});
