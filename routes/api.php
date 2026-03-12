@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\FrontController;
 use App\Http\Controllers\Api\V1\InqueryController;
 use App\Http\Controllers\Api\V1\InqueryFollowupController;
 use App\Http\Controllers\Api\V1\FieldVisitsController;
+use App\Http\Controllers\Api\V1\RequestForPostsController;
 
 Route::prefix('v1')->group(function () {
 
@@ -19,6 +20,7 @@ Route::prefix('v1')->group(function () {
 
     Route::post('/frontTour', [FieldVisitsController::class, 'frontTour']);
    Route::post('/frontInquery', [InqueryController::class, 'frontInquery']);
+   Route::post('/frontrequestPost', [RequestForPostsController::class, 'frontrequestPost']);
 
     Route::get('/property-summary', [FrontController::class, 'propertySummary']);
     Route::get('/property-details/{slug}', [FrontController::class, 'propertyDetail']);
