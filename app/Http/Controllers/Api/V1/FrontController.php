@@ -69,7 +69,24 @@ class FrontController extends BaseController
                 'listingType', 
                 'propertyStatus', 
                 'images',
-                'address'
+                'address',
+                'houseDetails',
+                'houseDetails.furnishing',
+                'houseDetails.houseType',
+                'houseDetails.builtAreaUnit',
+                'houseDetails.constructionStatus',
+                'houseDetails.roofType',
+                'houseDetails.parkingType',
+                'houseDetails.parkingAreaUnit',
+                'houseDetails.buildingFace',
+                'propertyType',
+                'roadType',
+                'roadCondition',
+                'waterSource',
+                'sewageType',
+                'landUnit',
+                'measureUnit',
+                'propertyCategory'
             ])
                 ->where('slug', $slug)
                 ->first();

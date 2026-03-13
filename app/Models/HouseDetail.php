@@ -15,6 +15,7 @@ use App\Models\Data\RoofType;
 use App\Models\Data\PropertyFace;
 use App\Models\User;
 use App\Models\Data\Unit;
+use App\Models\Data\ParkingType;
 
 
 
@@ -107,6 +108,7 @@ class HouseDetail extends Model
         return $this->belongsTo(Furnishing::class, 'furnishing_id');
     }
 
+
     /**
      * Get the house type.
      */
@@ -153,6 +155,11 @@ class HouseDetail extends Model
     public function buildingFace(): BelongsTo
     {
         return $this->belongsTo(PropertyFace::class, 'building_face_id');
+    }
+
+    public function parkingType()
+    {
+        return $this->belongsTo(ParkingType::class, 'parking_type_id');
     }
 
     /**

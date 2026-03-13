@@ -19,6 +19,7 @@ use App\Models\Data\Unit;
 use App\Models\Data\PropertyFace;
 use App\Models\User;
 use App\Auditable;
+use App\Models\Data\PropertyCategory;
 
 
 class Property extends Model
@@ -427,5 +428,10 @@ class Property extends Model
         }
 
         return date('Y') - $this->houseDetails->year_built;
+    }
+
+    public function propertyCategory()
+    {
+        return $this->belongsTo(PropertyCategory::class, 'property_category_id');
     }
 }
