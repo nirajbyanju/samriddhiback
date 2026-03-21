@@ -77,7 +77,8 @@ class Property extends Model
         'updated_by',
         'verified_by',
         'verified_at',
-        'status'
+        'status',
+        'is_status'
     ];
 
     /**

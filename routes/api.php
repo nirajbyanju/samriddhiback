@@ -12,15 +12,13 @@ use App\Http\Controllers\Api\V1\FrontController;
 use App\Http\Controllers\Api\V1\InqueryController;
 use App\Http\Controllers\Api\V1\InqueryFollowupController;
 use App\Http\Controllers\Api\V1\FieldVisitsController;
-use App\Http\Controllers\Api\V1\RequestForPostsController;
 
 Route::prefix('v1')->group(function () {
 
     // frontend routes
 
     Route::post('/frontTour', [FieldVisitsController::class, 'frontTour']);
-   Route::post('/frontInquery', [InqueryController::class, 'frontInquery']);
-   Route::post('/frontrequestPost', [RequestForPostsController::class, 'frontrequestPost']);
+    Route::post('/frontInquery', [InqueryController::class, 'frontInquery']);
 
     Route::get('/property-summary', [FrontController::class, 'propertySummary']);
     Route::get('/property-details/{slug}', [FrontController::class, 'propertyDetail']);
@@ -80,6 +78,15 @@ Route::prefix('v1')->group(function () {
             Route::get('/role/{roleId}/employees', [EmployeePermissionController::class, 'getEmployeesByRole']);
         });
 
+        // Route::prefix('request-for-posts')->group(function () {
+        //     Route::get('/', [RequestForPostsController::class, 'index']);
+        //     Route::post('/', [RequestForPostsController::class, 'store']);
+        //     Route::get('/{requestForPost}', [RequestForPostsController::class, 'show']);
+        //     Route::post('/{requestForPost}', [RequestForPostsController::class, 'update']);
+        //     Route::delete('/{id}', [RequestForPostsController::class, 'destroy']);
+        //     Route::patch('/status/{id}', [RequestForPostsController::class, 'updateStatus']);
+        // });
+
         Route::get('/options', [OptionController::class, 'fetchOption']);
         Route::post('/options', [OptionController::class, 'store']);
         Route::get('/options/{id}', [OptionController::class, 'getOptionById']);
@@ -100,4 +107,31 @@ Route::prefix('v1')->group(function () {
     Route::apiResource('inqueries', InqueryController::class);
     Route::apiResource('inquery-followups', InqueryFollowupController::class);
 
+
+
+    Route::prefix('property-inqueries')->group(function () {
+        Route::get('/', [InqueryController::class, 'index']);
+        Route::post('/', [InqueryController::class, 'store']);
+        Route::get('/{inquery}', [InqueryController::class, 'show']);
+        Route::post('/{inquery}', [InqueryController::class, 'update']);
+        Route::delete('/{id}', [InqueryController::class, 'destroy']);
+    });
+
+    Route::prefix('properties-inqueries/followups')->group(function () {
+        Route::get('/{inqueryId}', [InqueryFollowupController::class, 'index']);
+        Route::post('/', [InqueryFollowupController::class, 'store']);
+        Route::get('/{inqueryFollowup}', [InqueryFollowupController::class, 'show']);
+        Route::post('/{inqueryFollowup}', [InqueryFollowupController::class, 'update']);
+        Route::delete('/{id}', [InqueryFollowupController::class, 'destroy']);
+    });
+
+
+    Route::prefix('properties-fieldVisit')->group(function () {
+        Route::get('/{propertyId}', [FieldVisitsController::class, 'index']);
+        Route::post('/', [FieldVisitsController::class, 'store']);
+        Route::get('/{fieldVisit}', [FieldVisitsController::class, 'show']);
+        Route::post('/{fieldVisit}', [FieldVisitsController::class, 'update']);
+        Route::delete('/{id}', [FieldVisitsController::class, 'destroy']);
+        Route::patch('/status/{id}', [FieldVisitsController::class, 'updateStatus']);
+    });
 });

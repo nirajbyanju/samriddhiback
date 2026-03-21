@@ -44,6 +44,9 @@ class DatabaseSeeder extends Seeder
             ContactMethodSeeder::class,
             FollowupStatusSeeder::class,
             HouseMaterialsSeeder::class,
+            ContentMethodSeeder::class,
+            RequestTypeSeeder::class,
+            StatusSeeder::class,
 
 
 

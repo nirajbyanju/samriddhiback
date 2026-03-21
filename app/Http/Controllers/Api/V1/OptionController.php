@@ -201,6 +201,27 @@ class OptionController extends BaseController
                 'update' => ['label' => 'sometimes|required|string|max:255']
             ]
         ],
+        'contact_method' => [
+            'model' => \App\Models\Data\ContactMethod::class,
+            'validation' => [
+                'store' => ['label' => 'required|string|max:255'],
+                'update' => ['label' => 'sometimes|required|string|max:255']
+            ]
+        ],
+        'status' => [
+            'model' => \App\Models\Data\Status::class,
+            'validation' => [
+                'store' => ['label' => 'required|string|max:255'],
+                'update' => ['label' => 'sometimes|required|string|max:255']
+            ]
+        ],
+        'request_type' => [
+            'model' => \App\Models\Data\RequestType::class,
+            'validation' => [
+                'store' => ['label' => 'required|string|max:255'],
+                'update' => ['label' => 'sometimes|required|string|max:255']
+            ]
+        ],
 
     ];
 

@@ -15,6 +15,8 @@ class InqueryFollowup extends Model
 {
     use HasFactory, SoftDeletes;
 
+    protected $table = 'inqury_followups';
+
     protected $fillable = [
         'inquiry_id',
         'admin_id',

@@ -14,15 +14,19 @@ class Inquery extends Model
     protected $table = 'inquiries';
     protected $fillable = [
         'property_id',
+        'from',
         'inquiry_type_id',
         'property_type_id',
         'name',
         'email',
         'phone',
-        'preferred_location',
-        'min_price',
-        'max_price',
+        'location',
+        'budget',
         'message',
+        'description',
+        'response_type_id',
+        'reason',
+      
     ];
 
     public function property()

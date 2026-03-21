@@ -13,7 +13,8 @@ return new class extends Migration
     {
         Schema::create('inquiries', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('property_id')->constrained()->cascadeOnDelete()->nullable();
+            $table->unsignedInteger('property_id')->nullable();
+            $table->string('from'); //  1 - request, 2 - inquiry
             $table->unsignedInteger('inquiry_type_id'); // 1 - buy, 2 - sell
             $table->unsignedInteger('property_type_id')->nullable(); // 1 - house, 2 - land, 3 - commercial
 
@@ -21,15 +22,17 @@ return new class extends Migration
             $table->string('email')->nullable();
             $table->string('phone')->nullable();
 
-            $table->string('preferred_location')->nullable();
 
-            $table->decimal('min_price', 12, 2)->nullable();
-            $table->decimal('max_price', 12, 2)->nullable();
+            $table->string('budget')->nullable();
+
+            $table->text('location')->nullable();
 
 
 
             $table->text('message')->nullable();
-
+            $table->longText('description')->nullable();
+            $table->string('response_type_id')->nullable();
+            $table->text('reason')->nullable();
             $table->status();
             $table->userAuditable();
             $table->timestamps();
