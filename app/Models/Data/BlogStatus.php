@@ -8,7 +8,7 @@ use App\Auditable;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Models\User;
 
-class Status extends Model
+class BlogStatus extends Model
 {
     use HasFactory, SoftDeletes, Auditable;
     protected $table = 'data_status';

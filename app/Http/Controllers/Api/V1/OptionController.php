@@ -209,7 +209,7 @@ class OptionController extends BaseController
             ]
         ],
         'status' => [
-            'model' => \App\Models\Data\Status::class,
+            'model' => \App\Models\Data\BlogStatus::class,
             'validation' => [
                 'store' => ['label' => 'required|string|max:255'],
                 'update' => ['label' => 'sometimes|required|string|max:255']
