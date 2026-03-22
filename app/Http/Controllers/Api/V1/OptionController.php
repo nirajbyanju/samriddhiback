@@ -216,7 +216,7 @@ class OptionController extends BaseController
             ]
         ],
         'request_type' => [
-            'model' => \App\Models\Data\RequestType::class,
+            'model' => \App\Models\Data\RequestTypes::class,
             'validation' => [
                 'store' => ['label' => 'required|string|max:255'],
                 'update' => ['label' => 'sometimes|required|string|max:255']

@@ -8,7 +8,7 @@ use App\Auditable;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Models\User;
 
-class RequestType extends Model
+class RequestTypes extends Model
 {
     protected $table = 'data_request_types';
     protected $fillable = [

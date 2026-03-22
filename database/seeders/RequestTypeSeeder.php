@@ -28,7 +28,7 @@ class RequestTypeSeeder extends Seeder
         ];
 
         foreach ($request_type as $request_type) {
-            \App\Models\Data\RequestType::create($request_type);
+            \App\Models\Data\RequestTypes::create($request_type);
         }
     }
 }
