@@ -222,6 +222,13 @@ class OptionController extends BaseController
                 'update' => ['label' => 'sometimes|required|string|max:255']
             ]
         ],
+        'category' => [
+            'model' => \App\Models\Data\Category::class,
+            'validation' => [
+                'store' => ['label' => 'required|string|max:255'],
+                'update' => ['label' => 'sometimes|required|string|max:255']
+            ]
+        ],
 
     ];
 

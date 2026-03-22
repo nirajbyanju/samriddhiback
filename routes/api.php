@@ -12,6 +12,8 @@ use App\Http\Controllers\Api\V1\FrontController;
 use App\Http\Controllers\Api\V1\InqueryController;
 use App\Http\Controllers\Api\V1\InqueryFollowupController;
 use App\Http\Controllers\Api\V1\FieldVisitsController;
+use App\Http\Controllers\Api\V1\BlogController;
+use App\Http\Controllers\Api\V1\Frontend\BlogsController;
 
 Route::prefix('v1')->group(function () {
 
@@ -133,5 +135,22 @@ Route::prefix('v1')->group(function () {
         Route::post('/{fieldVisit}', [FieldVisitsController::class, 'update']);
         Route::delete('/{id}', [FieldVisitsController::class, 'destroy']);
         Route::patch('/status/{id}', [FieldVisitsController::class, 'updateStatus']);
+    });
+
+    route::middleware('auth:sanctum')->prefix('blog')->controller(BlogController::class)->group(function () {
+        Route::get('/', 'list')->name('blog.list');
+        Route::post('/', 'create')->name('blog.create')->middleware('throttle:10,1');
+        Route::get('/{id}', 'listing')->name('blog.show')->middleware('throttle:30,1');
+        Route::post('/{id}', 'update')->name('blog.update')->middleware('throttle:10,1');
+        Route::patch('/status/{id}', 'updateStatus')->name('blog.updateStatus')->middleware('throttle:30,1');
+        Route::delete('/{id}', 'delete')->name('blog.delete')->middleware('throttle:30,1');
+    });
+
+    Route::prefix('frontend')->group(function () {
+        Route::controller(BlogsController::class)->group(function () {
+            Route::get('/blog', 'view');
+            Route::get('/blog/{slug}', 'details')->middleware('throttle:30,1');
+            Route::get('/blog-list/{id}', 'viewing')->middleware('throttle:30,1');
+        });
     });
 });

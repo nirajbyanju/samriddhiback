@@ -48,46 +48,45 @@ class RegistrationService
     // }
 
     public function registerUser(array $data)
-{
-    DB::beginTransaction();
+    {
+        DB::beginTransaction();
 
-    try {
+        try {
 
-        // Generate a user code
-        $currentYear = now()->year;
-        $latestId = User::max('id') + 1;
-        $userCode = "Opsh-{$currentYear}-{$latestId}";
+            // Generate a user code
+            $currentYear = now()->year;
+            $latestId = User::max('id') + 1;
+            $userCode = "Opsh-{$currentYear}-{$latestId}";
 
-        $mappedData = [
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'phone' => $data['phone'],
-            'password' => Hash::make($data['password']),
-        ];
+            $mappedData = [
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'phone' => $data['phone'],
+                'password' => Hash::make($data['password']),
+            ];
 
-        // Create User
-        $user = User::create($mappedData);
+            // Create User
+            $user = User::create($mappedData);
+            UserDetail::create(['user_id' => $user->id]);
 
-        // ✅ Assign role properly (DO NOT use hardcoded ID)
-        $user->assignRole('user'); // make sure this role exists
+            // ✅ Assign role properly (DO NOT use hardcoded ID)
+            $user->assignRole('user'); // make sure this role exists
 
-        // Send email verification
-        // $user->sendEmailVerificationNotification();
+            // Send email verification
+            // $user->sendEmailVerificationNotification();
 
-        // Create token
-        $token = $user->createToken('MyApp')->plainTextToken;
+            // Create token
+            $token = $user->createToken('MyApp')->plainTextToken;
 
-        DB::commit();
+            DB::commit();
 
-        return [
-            'token' => $token,
-            'name' => $user->name,
-        ];
-
-    } catch (\Exception $e) {
-        DB::rollBack();
-        throw $e;
+            return [
+                'token' => $token,
+                'name' => $user->name,
+            ];
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
     }
 }
-}
-

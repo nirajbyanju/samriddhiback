@@ -223,7 +223,10 @@ class PermissionMatrixSeeder extends Seeder
     private function createTestUsers()
     {
         $admin = User::create([
-            'name' => 'Niraj Byanju',
+            'userCode' => 'sm-2026-1',
+            'first_name' => 'Niraj',
+            'last_name' => 'Byanju',
+            'username' => 'nirajbyanju1234',
             'email' => 'nirajbyanju1234@gmail.com', // <-- Fixed missing quote
             'email_verified_at' => now(),
             'phone' => '+919876543210', // <-- Fixed missing quote
@@ -233,7 +236,10 @@ class PermissionMatrixSeeder extends Seeder
         $admin->assignRole('Super Admin');
 
         $manager = User::create([
-            'name' => 'Niraj Byanju',
+            'userCode' => 'sm-2026-2',
+            'first_name' => 'Niraj',
+            'last_name' => 'Byanju',
+            'username' => 'byanju',
             'email' => 'byanju@example.com',
             'email_verified_at' => now(),
             'phone' => '+91987693210', // <-- Fixed missing quote
@@ -243,7 +249,10 @@ class PermissionMatrixSeeder extends Seeder
         $manager->assignRole('Manager');
 
         $employee = User::create([
-            'name' => 'Niraj Byanju',
+            'userCode' => 'sm-2026-3',
+            'first_name' => 'Niraj',
+            'last_name' => 'Byanju',
+            'username' => 'byanju1',
             'email' => 'byanju1@example.com',
             'email_verified_at' => now(),
             'phone' => '+91987593210', // <-- Fixed missing quote

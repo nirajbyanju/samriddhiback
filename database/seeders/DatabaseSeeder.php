@@ -47,6 +47,7 @@ class DatabaseSeeder extends Seeder
             ContentMethodSeeder::class,
             RequestTypeSeeder::class,
             StatusSeeder::class,
+            CategorySeeder::class
 
 
 
