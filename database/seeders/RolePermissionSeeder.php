@@ -10,23 +10,62 @@ class RolePermissionSeeder extends Seeder
 {
     public function run()
     {
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+
+        // ✅ All feature permissions
         $permissions = [
-            'property.create','property.edit','property.delete','property.view'
+            'view_dashboard',
+            'view_employees','create_employees','edit_employees','delete_employees',
+            'view_menus','create_menus','edit_menus','delete_menus',
+            'view_reports','export_reports',
+            'view_settings','edit_settings',
+            'view_products','create_products','edit_products','delete_products',
+            'view_orders','create_orders','edit_orders','approve_orders',
+            'view_inventory','edit_inventory','upload_inventory',
+            'manage_all'
         ];
 
-        foreach($permissions as $perm){
-            Permission::create(['name'=>$perm]);
+        foreach ($permissions as $perm) {
+            Permission::firstOrCreate(['name' => $perm, 'guard_name' => 'web']);
         }
 
-        $roles = ['admin','manager','agent','employee','user'];
-
-        foreach($roles as $roleName){
-            $role = Role::create(['name'=>$roleName]);
+        // ✅ Roles
+        $roles = ['Super Admin','Admin','Manager','Employee'];
+        foreach ($roles as $roleName) {
+            Role::firstOrCreate(['name' => $roleName]);
         }
 
-        // Role::findByName('admin')->givePermissionTo($permissions);
-        // Role::findByName('manager')->givePermissionTo(['property.create','property.edit','property.view']);
-        // Role::findByName('agent')->givePermissionTo(['property.create','property.edit','property.view']);
-        // Role::findByName('employee')->givePermissionTo(['property.view']);
+        // Assign all permissions to Super Admin
+        Role::findByName('Super Admin')->givePermissionTo(Permission::all());
+
+        // Assign Admin permissions
+        Role::findByName('Admin')->givePermissionTo([
+            'view_dashboard',
+            'view_employees','create_employees','edit_employees','delete_employees',
+            'view_menus','create_menus','edit_menus','delete_menus',
+            'view_reports','export_reports',
+            'view_settings','edit_settings',
+            'view_products','create_products','edit_products','delete_products',
+            'view_orders','create_orders','edit_orders','approve_orders',
+            'view_inventory','edit_inventory','upload_inventory',
+        ]);
+
+        // Assign Manager permissions
+        Role::findByName('Manager')->givePermissionTo([
+            'view_dashboard',
+            'view_employees',
+            'view_reports','export_reports',
+            'view_products','create_products','edit_products',
+            'view_orders','create_orders','edit_orders',
+            'view_inventory','edit_inventory',
+        ]);
+
+        // Assign Employee permissions
+        Role::findByName('Employee')->givePermissionTo([
+            'view_dashboard',
+            'view_products',
+            'view_orders','create_orders',
+            'view_inventory',
+        ]);
     }
 }

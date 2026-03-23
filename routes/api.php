@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\InqueryFollowupController;
 use App\Http\Controllers\Api\V1\FieldVisitsController;
 use App\Http\Controllers\Api\V1\BlogController;
 use App\Http\Controllers\Api\V1\Frontend\BlogsController;
+use App\Http\Controllers\MenusController;
 
 Route::prefix('v1')->group(function () {
 
@@ -146,6 +147,8 @@ Route::prefix('v1')->group(function () {
         Route::patch('/status/{id}', 'updateStatus')->name('blog.updateStatus')->middleware('throttle:30,1');
         Route::delete('/{id}', 'delete')->name('blog.delete')->middleware('throttle:30,1');
     });
+
+    Route::middleware('auth:sanctum')->get('/user/menu', [MenusController::class,'getMenu']);
 
     Route::prefix('frontend')->group(function () {
         Route::controller(BlogsController::class)->group(function () {

@@ -12,6 +12,8 @@ use App\Models\User;
 class Menu extends Model
 {
    use HasFactory, SoftDeletes, Auditable;
+
+    protected $table = 'menus';
     
     protected $fillable = [
         'name',
