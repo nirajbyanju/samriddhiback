@@ -58,6 +58,74 @@ class RegistrationService
             $latestId = User::max('id') + 1;
             $userCode = "Opsh-{$currentYear}-{$latestId}";
 
+            $nameParts = explode(' ', trim($data['name']));
+
+            $firstName = $nameParts[0] ?? null;
+            $lastName = count($nameParts) > 1 ? end($nameParts) : null;
+
+            // Middle name (everything except first and last)
+            if (count($nameParts) > 2) {
+                $middleName = implode(' ', array_slice($nameParts, 1, -1));
+            } else {
+                $middleName = null;
+            }
+            $baseUsername = strtolower(str_replace(' ', '', $data['name']));
+            $username = $baseUsername;
+            $counter = 1;
+
+            // Check uniqueness
+            while (User::where('username', $username)->exists()) {
+                $username = $baseUsername . $counter;
+                $counter++;
+            }
+
+            $mappedData = [
+                'first_name' => $firstName,
+                'middle_name' => $middleName,
+                'last_name' => $lastName,
+                'username' => $username,
+                'email' => $data['email'],
+                'phone' => $data['phone'],
+                'password' => Hash::make($data['password']),
+            ];
+
+            // Create User
+            $user = User::create($mappedData);
+            UserDetail::create(['user_id' => $user->id]);
+
+            // ✅ Assign role properly (DO NOT use hardcoded ID)
+            $user->assignRole('user'); // make sure this role exists
+
+            // Send email verification
+            // $user->sendEmailVerificationNotification();
+
+            // Create token
+            $token = $user->createToken('MyApp')->plainTextToken;
+
+            DB::commit();
+
+            return [
+                'token' => $token,
+                'name' => $user->name,
+            ];
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
+
+
+    public function registerAdmin(array $data)
+    {
+        DB::beginTransaction();
+
+        try {
+
+            // Generate a user code
+            $currentYear = now()->year;
+            $latestId = User::max('id') + 1;
+            $userCode = "Opsh-{$currentYear}-{$latestId}";
+
             $mappedData = [
                 'name' => $data['name'],
                 'email' => $data['email'],
@@ -70,7 +138,7 @@ class RegistrationService
             UserDetail::create(['user_id' => $user->id]);
 
             // ✅ Assign role properly (DO NOT use hardcoded ID)
-            $user->assignRole('user'); // make sure this role exists
+            $user->assignRole('admin'); // make sure this role exists
 
             // Send email verification
             // $user->sendEmailVerificationNotification();

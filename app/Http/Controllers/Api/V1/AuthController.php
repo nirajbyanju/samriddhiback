@@ -51,6 +51,21 @@ class AuthController extends BaseController
         ], 201);
     }
 
+    public function adminRegister(RegisterUserRequest $request): JsonResponse
+    {
+        // Use the service to register the user
+        $userData = $this->registrationService->registerAdmin($request->all());
+        $userData['roles'] = ['admin'];
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'token' => $userData['token'],
+                'name' => $userData['name'],
+            ],
+            'message' => 'User registered successfully.',
+        ], 201);
+    }
+
 
     /**
      * Login api

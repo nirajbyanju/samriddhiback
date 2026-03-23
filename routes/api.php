@@ -30,6 +30,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/get-inquery', [FrontController::class, 'getInquery']);
 
     Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/admin-register', [AuthController::class, 'adminRegister']);
     Route::post('/login', [AuthController::class, 'login']);
     Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
     Route::post('/refresh', [AuthController::class, 'refreshToken']);
