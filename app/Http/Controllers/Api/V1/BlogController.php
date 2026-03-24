@@ -2,54 +2,54 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use App\Services\BlogService;
 use App\Http\Requests\StatusUpdateRequest;
-use Illuminate\Support\Facades\Auth;
+use App\Models\BlogPost;
+use App\Services\BlogService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 class BlogController extends BaseController
 {
-    protected $BlogService;
+    protected BlogService $blogService;
 
-    public function __construct(BlogService $categoryService)
+    public function __construct(BlogService $blogService)
     {
-        $this->BlogService = $categoryService;
+        $this->blogService = $blogService;
     }
 
 
-    public function create(Request $request)
+    public function store(Request $request): JsonResponse
     {
         try {
             $data = $request->all();
-            $data['createdBy'] = Auth::user()->id;
-            $createBlog = $this->BlogService->createBlog($data);
+            $data['createdBy'] = Auth::id();
+            $blogPost = $this->blogService->create($data, $request->file('thumbnail'));
 
             return response()->json([
                 'success' => true,
-                'data' => $createBlog,
+                'data' => $blogPost,
                 'message' => 'Blog post created successfully',
             ], 201);
         } catch (\Exception $e) {
-            // Log the full error message and stack trace
-            Log::error("Error in create blog post: " . $e->getMessage());
-            Log::error("Stack trace: " . $e->getTraceAsString());
+            Log::error('Error creating blog post', [
+                'message' => $e->getMessage(),
+                'exception' => $e,
+            ]);
 
-            // Return a response with the error message
             return response()->json([
                 'success' => false,
                 'message' => 'An error occurred while creating the blog post. Please try again later.',
-                'error' => $e->getMessage(),  // This will still send the exception message back
-            ], 500);  // HTTP 500 Internal Server Error
+                'error' => config('app.debug') ? $e->getMessage() : 'An unexpected error occurred.',
+            ], 500);
         }
     }
 
 
-    public function list(Request $request)
+    public function index(Request $request): JsonResponse
     {
-        $paginatedResults = $this->BlogService->listActiveBlogPost($request);
+        $paginatedResults = $this->blogService->list($request);
 
         if ($paginatedResults->isEmpty()) {
             return response()->json([
@@ -66,7 +66,7 @@ class BlogController extends BaseController
         }
 
         return response()->json([
-            'status' => true,
+            'success' => true,
             'message' => 'List of posts',
             'data' => $paginatedResults->items(),
             'pagination' => [
@@ -78,9 +78,9 @@ class BlogController extends BaseController
         ], 200);
     }
 
-    public function listing($id): JsonResponse
+    public function show(BlogPost $blogPost): JsonResponse
     {
-        $data = $this->BlogService->getBlogPostById($id);
+        $data = $this->blogService->show($blogPost);
 
         return response()->json([
             'success' => true,
@@ -89,37 +89,37 @@ class BlogController extends BaseController
         ], 200);
     }
 
-    public function update(Request $request, $id): JsonResponse
+    public function update(Request $request, BlogPost $blogPost): JsonResponse
     {
-        $data = $this->BlogService->getUpdateById($id, $request->all());
+        $data = $this->blogService->update($blogPost, $request->all(), $request->file('thumbnail'));
+
         return response()->json([
             'success' => true,
-            'data' =>  $data,
+            'data' => $data,
             'message' => 'Blog post have been successfully updated',
         ], 200);
     }
 
-    public function updateStatus($id, StatusUpdateRequest $request)
+    public function updateStatus(StatusUpdateRequest $request, BlogPost $blogPost): JsonResponse
     {
-        // Fetch the data using the service
-        $data = $this->BlogService->getUpdateStatusById($id, $request);
+        $data = $this->blogService->updateStatus(
+            $blogPost,
+            (int) $request->validated()['isStatus']
+        );
 
-        // Return a JSON response with success status and updated data
         return response()->json([
             'success' => true,
-            'data' =>  $data,  // Assuming 'category' is correct
+            'data' => $data,
             'message' => 'Blog post has been successfully updated',
         ], 200);
     }
 
-    public function delete($id): JsonResponse
+    public function destroy(BlogPost $blogPost): JsonResponse
     {
-        $data = $this->BlogService->getDeleteById($id);
+        $this->blogService->delete($blogPost);
+
         return response()->json([
             'success' => true,
-            'data' => [
-                'blogPost' => $data,
-            ],
             'message' => 'Blog post have been successfully delete',
         ], 200);
     }

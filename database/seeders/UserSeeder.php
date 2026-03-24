@@ -15,7 +15,7 @@ class UserSeeder extends Seeder
             'first_name' => 'Niraj',
             'last_name' => 'Byanju',
             'username' => 'nirajbyanju',
-            'email' => 'nirajbyanju@example.com',
+            'email' => 'nirajbyanju1234@gmail.com',
             'email_verified_at' => now(),
             'phone' => '+9779800000000',
             'password' => bcrypt('password'),

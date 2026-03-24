@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use App\Http\Requests\RegisterUserRequest;
 use Illuminate\Support\Facades\Hash;
 use App\Services\RegistrationService;
+use App\Services\UserMenuService;
 use Carbon\Carbon;
 use App\Models\RefreshToken;
 use Illuminate\Support\Facades\DB;
@@ -19,12 +20,15 @@ use Illuminate\Support\Facades\DB;
 class AuthController extends BaseController
 {
     protected RegistrationService $registrationService;
+    protected UserMenuService $userMenuService;
 
 
     public function __construct(
         RegistrationService $registrationService,
+        UserMenuService $userMenuService,
     ) {
         $this->registrationService = $registrationService;
+        $this->userMenuService = $userMenuService;
     }
 
 
@@ -126,9 +130,6 @@ class AuthController extends BaseController
         $accessToken = $user->createToken('auth-token', ['*'], Carbon::now()->addHour())->plainTextToken;
         $refreshToken = RefreshToken::createForUser($user);
 
-        // Consider caching menu data
-
-
         $result = [
             'token' => $accessToken,
             'refresh_token' => $refreshToken->token,
@@ -142,6 +143,7 @@ class AuthController extends BaseController
                 'email' => $user->email,
                 'roles' => $user->roles->pluck('name'),
             ],
+            'menus' => $this->userMenuService->getForUser($user),
         ];
 
         return response()->json([
@@ -227,6 +229,7 @@ class AuthController extends BaseController
                         'email' => $user->email,
                         'roles' => $user->roles->pluck('name'),
                     ],
+                    'menus' => $this->userMenuService->getForUser($user),
                 ],
                 'message' => 'Token refreshed successfully.'
             ], 200);

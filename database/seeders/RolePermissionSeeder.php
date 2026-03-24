@@ -2,70 +2,108 @@
 
 namespace Database\Seeders;
 
+use App\Models\Menu;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class RolePermissionSeeder extends Seeder
 {
-    public function run()
+    private const SYSTEM_PERMISSIONS = [
+        'view_menus',
+        'create_menus',
+        'edit_menus',
+        'delete_menus',
+        'view_roles',
+        'create_roles',
+        'edit_roles',
+        'delete_roles',
+        'view_permissions',
+        'edit_permissions',
+        'view_employees',
+        'edit_employees',
+        'manage_all',
+    ];
+
+    private const MENU_ACTIONS = [
+        'view',
+        'create',
+        'edit',
+        'delete',
+        'approve',
+        'export',
+        'upload',
+        'manage',
+    ];
+
+    public function run(): void
     {
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
-        // ✅ All feature permissions
-        $permissions = [
-            'view_dashboard',
-            'view_employees','create_employees','edit_employees','delete_employees',
-            'view_menus','create_menus','edit_menus','delete_menus',
-            'view_reports','export_reports',
-            'view_settings','edit_settings',
-            'view_products','create_products','edit_products','delete_products',
-            'view_orders','create_orders','edit_orders','approve_orders',
-            'view_inventory','edit_inventory','upload_inventory',
-            'manage_all'
-        ];
-
-        foreach ($permissions as $perm) {
-            Permission::firstOrCreate(['name' => $perm, 'guard_name' => 'web']);
+        foreach (self::SYSTEM_PERMISSIONS as $permissionName) {
+            Permission::firstOrCreate([
+                'name' => $permissionName,
+                'guard_name' => 'web',
+            ]);
         }
 
-        // ✅ Roles
-        $roles = ['Super Admin','Admin','Manager','Employee'];
-        foreach ($roles as $roleName) {
-            Role::firstOrCreate(['name' => $roleName]);
+        foreach (['Super Admin', 'Admin', 'Manager', 'Employee'] as $roleName) {
+            Role::firstOrCreate([
+                'name' => $roleName,
+                'guard_name' => 'web',
+            ]);
         }
 
-        // Assign all permissions to Super Admin
-        Role::findByName('Super Admin')->givePermissionTo(Permission::all());
+        $menuPermissionBases = Menu::query()
+            ->whereNotNull('permission_name')
+            ->pluck('permission_name')
+            ->filter()
+            ->unique()
+            ->values();
 
-        // Assign Admin permissions
-        Role::findByName('Admin')->givePermissionTo([
+        $menuPermissions = $menuPermissionBases
+            ->flatMap(function ($permissionBase) {
+                return collect(self::MENU_ACTIONS)
+                    ->map(fn (string $action) => "{$action}_{$permissionBase}");
+            })
+            ->unique()
+            ->values();
+
+        foreach ($menuPermissions as $permissionName) {
+            Permission::firstOrCreate([
+                'name' => $permissionName,
+                'guard_name' => 'web',
+            ]);
+        }
+
+        $allPermissionNames = collect(self::SYSTEM_PERMISSIONS)
+            ->merge($menuPermissions)
+            ->unique()
+            ->values()
+            ->all();
+
+        Role::findByName('Super Admin')->syncPermissions(Permission::all());
+
+        Role::findByName('Admin')->syncPermissions($allPermissionNames);
+
+        Role::findByName('Manager')->syncPermissions([
             'view_dashboard',
-            'view_employees','create_employees','edit_employees','delete_employees',
-            'view_menus','create_menus','edit_menus','delete_menus',
-            'view_reports','export_reports',
-            'view_settings','edit_settings',
-            'view_products','create_products','edit_products','delete_products',
-            'view_orders','create_orders','edit_orders','approve_orders',
-            'view_inventory','edit_inventory','upload_inventory',
+            'view_property', 'create_property', 'edit_property',
+            'view_field_visit', 'create_field_visit', 'edit_field_visit',
+            'view_property_inquiry', 'create_property_inquiry', 'edit_property_inquiry',
+            'view_blog', 'create_blog', 'edit_blog',
+            'view_settings', 'edit_settings',
+            'view_settings_option',
         ]);
 
-        // Assign Manager permissions
-        Role::findByName('Manager')->givePermissionTo([
+        Role::findByName('Employee')->syncPermissions([
             'view_dashboard',
-            'view_employees',
-            'view_reports','export_reports',
-            'view_products','create_products','edit_products',
-            'view_orders','create_orders','edit_orders',
-            'view_inventory','edit_inventory',
+            'view_property',
+            'view_field_visit',
+            'view_property_inquiry',
+            'view_blog',
         ]);
 
-        // Assign Employee permissions
-        Role::findByName('Employee')->givePermissionTo([
-            'view_dashboard',
-            'view_products',
-            'view_orders','create_orders',
-            'view_inventory',
-        ]);
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
     }
 }

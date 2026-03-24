@@ -20,9 +20,9 @@ class DatabaseSeeder extends Seeder
         // User::factory(10)->create();
 
         $this->call([
+            MenuSeeder::class,
             RolePermissionSeeder::class,
             // PermissionsSeeder::class,
-            MenuSeeder::class,
             // PermissionMatrixSeeder::class,
             UserSeeder::class,
 

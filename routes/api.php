@@ -8,153 +8,164 @@ use App\Http\Controllers\Api\V1\MenuController;
 use App\Http\Controllers\Api\V1\PermissionMatrixController;
 use App\Http\Controllers\Api\V1\EmployeePermissionController;
 use App\Http\Controllers\Api\V1\OptionController;
+use App\Http\Controllers\Api\V1\PermissionController;
 use App\Http\Controllers\Api\V1\FrontController;
 use App\Http\Controllers\Api\V1\InqueryController;
 use App\Http\Controllers\Api\V1\InqueryFollowupController;
 use App\Http\Controllers\Api\V1\FieldVisitsController;
 use App\Http\Controllers\Api\V1\BlogController;
 use App\Http\Controllers\Api\V1\Frontend\BlogsController;
+use App\Http\Controllers\Api\V1\RoleController;
+use App\Http\Controllers\Api\V1\UserAccessController;
 use App\Http\Controllers\MenusController;
+
+/*
+|--------------------------------------------------------------------------
+| API Routes v1
+|--------------------------------------------------------------------------
+*/
 
 Route::prefix('v1')->group(function () {
 
-    // frontend routes
+    // ==================== PUBLIC ROUTES ====================
+    Route::prefix('public')->as('public.')->group(function () {
 
-    Route::post('/frontTour', [FieldVisitsController::class, 'frontTour']);
-    Route::post('/frontInquery', [InqueryController::class, 'frontInquery']);
+        // Frontend/Tour routes
+        Route::post('/tour', [FieldVisitsController::class, 'frontTour'])->name('tour.store');
+        Route::post('/inquiry', [InqueryController::class, 'frontInquery'])->name('inquiry.store');
 
-    Route::get('/property-summary', [FrontController::class, 'propertySummary']);
-    Route::get('/property-details/{slug}', [FrontController::class, 'propertyDetail']);
-    Route::get('/property-list', [InqueryController::class, 'propertyList']);
+        // Property routes
+        Route::prefix('properties')->as('properties.')->group(function () {
+            Route::get('/summary', [FrontController::class, 'propertySummary'])->name('summary');
+            Route::get('/list', [InqueryController::class, 'propertyList'])->name('list');
+            Route::get('/{slug}/details', [FrontController::class, 'propertyDetail'])->name('details');
+        });
 
-    //getinquery from frontend
-    Route::get('/get-inquery', [FrontController::class, 'getInquery']);
+        // Inquiry routes
+        Route::get('/inquiries', [FrontController::class, 'getInquery'])->name('inquiries.index');
 
-    Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/admin-register', [AuthController::class, 'adminRegister']);
-    Route::post('/login', [AuthController::class, 'login']);
-    Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
-    Route::post('/refresh', [AuthController::class, 'refreshToken']);
+        // Authentication routes
+        Route::prefix('auth')->as('auth.')->group(function () {
+            Route::post('/register', [AuthController::class, 'register'])->name('register');
+            Route::post('/admin/register', [AuthController::class, 'adminRegister'])->name('admin.register');
+            Route::post('/login', [AuthController::class, 'login'])->name('login');
+            Route::post('/refresh', [AuthController::class, 'refreshToken'])->name('refresh');
+        });
 
+        // Options
+        Route::get('/options/all', [OptionController::class, 'getAllOptions'])->name('options.all');
 
-
-
-    Route::get('get-all-options', [OptionController::class, 'getAllOptions']);
-    // backend routes
-    Route::prefix('properties')->controller(PropertyController::class)->group(function () {
-        Route::get('/', [PropertyController::class, 'index']);
-        Route::post('/', [PropertyController::class, 'store']);
-        Route::get('/{property}', [PropertyController::class, 'show']);
-        Route::post('/{property}', [PropertyController::class, 'update']);
-        Route::delete('/{id}', [PropertyController::class, 'destroy']);
-        Route::patch('/status/{id}', [PropertyController::class, 'updateStatus']);
+        // Frontend blog routes
+        Route::prefix('blog')->as('blog.')->group(function () {
+            Route::get('/', [BlogsController::class, 'view'])->name('index');
+            Route::get('/list/{id}', [BlogsController::class, 'viewing'])->name('list');
+            Route::get('/{slug}', [BlogsController::class, 'details'])->name('details')->middleware('throttle:30,1');
+        });
     });
 
+    // ==================== AUTHENTICATED ROUTES ====================
     Route::middleware('auth:sanctum')->group(function () {
 
-        // User info
-        Route::get('/user', function (Request $request) {
-            return $request->user();
+        // User profile
+        Route::get('/user', fn(Request $request) => $request->user())->name('user.profile');
+        Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+        // ==================== MENU MANAGEMENT ====================
+        Route::prefix('menus')->as('menus.')->group(function () {
+            Route::get('/accessible', [MenuController::class, 'getAccessibleMenus'])->name('accessible');
+            Route::post('/reorder', [MenuController::class, 'reorder'])->name('reorder');
+            Route::put('/{menu}/role-permissions', [MenuController::class, 'syncRolePermissions'])->name('role-permissions.sync');
+            Route::apiResource('/', MenuController::class)->parameters(['' => 'menu']);
         });
 
-        // Menu routes (accessible based on permissions)
-        Route::middleware('auth:sanctum')->get('/accessible-menus', [MenuController::class, 'getAccessibleMenus']);
-        Route::apiResource('menus', MenuController::class);
-        Route::post('/menus/reorder', [MenuController::class, 'reorder']);
+        // ==================== RBAC MANAGEMENT ====================
+        Route::prefix('rbac')->as('rbac.')->group(function () {
+            Route::apiResource('roles', RoleController::class);
+            Route::get('/permissions', [PermissionController::class, 'index'])->name('permissions.index');
 
-        // Permission Matrix Routes (for admin)
-        Route::middleware('auth:sanctum')->prefix('permission-matrix')->group(function () {
-
-            Route::get('/', [PermissionMatrixController::class, 'index']);
-            Route::get('/grouped', [PermissionMatrixController::class, 'getMatrixGrouped']);
-            Route::post('/', [PermissionMatrixController::class, 'store']);
-            Route::put('/{permissionMatrix}', [PermissionMatrixController::class, 'update']);
-            Route::delete('/{permissionMatrix}', [PermissionMatrixController::class, 'destroy']);
-            Route::get('/employee/{roleId}', [PermissionMatrixController::class, 'getEmployeePermissions']);
-            Route::post('/employee/bulk-update', [PermissionMatrixController::class, 'bulkUpdateForEmployee']);
+            Route::prefix('users')->as('users.')->group(function () {
+                Route::get('/', [UserAccessController::class, 'index'])->name('index');
+                Route::get('/{user}/access', [UserAccessController::class, 'show'])->name('show');
+                Route::put('/{user}/roles', [UserAccessController::class, 'syncRoles'])->name('roles.sync');
+                Route::put('/{user}/permissions', [UserAccessController::class, 'syncPermissions'])->name('permissions.sync');
+            });
         });
 
-        // Employee Permission Routes
-        Route::prefix('employee-permissions')->group(function () {
-            Route::get('/roles', [EmployeePermissionController::class, 'getEmployeeRoles']);
-            Route::get('/matrix', [EmployeePermissionController::class, 'getEmployeePermissionMatrix']);
-            Route::post('/assign/{roleId}', [EmployeePermissionController::class, 'assignToEmployeeRole']);
-            Route::get('/role/{roleId}/employees', [EmployeePermissionController::class, 'getEmployeesByRole']);
+        // ==================== PERMISSION MATRIX ====================
+        Route::prefix('permission-matrix')->as('permission-matrix.')->group(function () {
+            Route::get('/', [PermissionMatrixController::class, 'index'])->name('index');
+            Route::get('/grouped', [PermissionMatrixController::class, 'getMatrixGrouped'])->name('grouped');
+            Route::post('/', [PermissionMatrixController::class, 'store'])->name('store');
+            Route::put('/{permissionMatrix}', [PermissionMatrixController::class, 'update'])->name('update');
+            Route::delete('/{permissionMatrix}', [PermissionMatrixController::class, 'destroy'])->name('destroy');
+            Route::get('/employee/{roleId}', [PermissionMatrixController::class, 'getEmployeePermissions'])->name('employee.permissions');
+            Route::post('/employee/bulk-update', [PermissionMatrixController::class, 'bulkUpdateForEmployee'])->name('employee.bulk-update');
         });
 
-        // Route::prefix('request-for-posts')->group(function () {
-        //     Route::get('/', [RequestForPostsController::class, 'index']);
-        //     Route::post('/', [RequestForPostsController::class, 'store']);
-        //     Route::get('/{requestForPost}', [RequestForPostsController::class, 'show']);
-        //     Route::post('/{requestForPost}', [RequestForPostsController::class, 'update']);
-        //     Route::delete('/{id}', [RequestForPostsController::class, 'destroy']);
-        //     Route::patch('/status/{id}', [RequestForPostsController::class, 'updateStatus']);
-        // });
-
-        Route::get('/options', [OptionController::class, 'fetchOption']);
-        Route::post('/options', [OptionController::class, 'store']);
-        Route::get('/options/{id}', [OptionController::class, 'getOptionById']);
-        Route::put('/options/{id}', [OptionController::class, 'update']);
-        Route::delete('/options/{id}/{type}', [OptionController::class, 'destroy']);
-        Route::get('/showOptions', [OptionController::class, 'showOption']);
-        Route::patch('/options/status/{id}', [OptionController::class, 'updateStatus']);
-        Route::get('/optionMenu', [OptionController::class, 'optionMenu']);
-
-        // fetch option dropdown
-        Route::get('get-dropdown/{slug}/{module?}', [OptionController::class, 'getDropdownOptions']);
-
-        // fetch all options
-    });
-
-    //inquery routes
-
-    Route::apiResource('inqueries', InqueryController::class);
-    Route::apiResource('inquery-followups', InqueryFollowupController::class);
-
-
-
-    Route::prefix('property-inqueries')->group(function () {
-        Route::get('/', [InqueryController::class, 'index']);
-        Route::post('/', [InqueryController::class, 'store']);
-        Route::get('/{inquery}', [InqueryController::class, 'show']);
-        Route::post('/{inquery}', [InqueryController::class, 'update']);
-        Route::delete('/{id}', [InqueryController::class, 'destroy']);
-    });
-
-    Route::prefix('properties-inqueries/followups')->group(function () {
-        Route::get('/{inqueryId}', [InqueryFollowupController::class, 'index']);
-        Route::post('/', [InqueryFollowupController::class, 'store']);
-        Route::get('/{inqueryFollowup}', [InqueryFollowupController::class, 'show']);
-        Route::post('/{inqueryFollowup}', [InqueryFollowupController::class, 'update']);
-        Route::delete('/{id}', [InqueryFollowupController::class, 'destroy']);
-    });
-
-
-    Route::prefix('properties-fieldVisit')->group(function () {
-        Route::get('/{propertyId}', [FieldVisitsController::class, 'index']);
-        Route::post('/', [FieldVisitsController::class, 'store']);
-        Route::get('/{fieldVisit}', [FieldVisitsController::class, 'show']);
-        Route::post('/{fieldVisit}', [FieldVisitsController::class, 'update']);
-        Route::delete('/{id}', [FieldVisitsController::class, 'destroy']);
-        Route::patch('/status/{id}', [FieldVisitsController::class, 'updateStatus']);
-    });
-
-    route::middleware('auth:sanctum')->prefix('blog')->controller(BlogController::class)->group(function () {
-        Route::get('/', 'list')->name('blog.list');
-        Route::post('/', 'create')->name('blog.create')->middleware('throttle:10,1');
-        Route::get('/{id}', 'listing')->name('blog.show')->middleware('throttle:30,1');
-        Route::post('/{id}', 'update')->name('blog.update')->middleware('throttle:10,1');
-        Route::patch('/status/{id}', 'updateStatus')->name('blog.updateStatus')->middleware('throttle:30,1');
-        Route::delete('/{id}', 'delete')->name('blog.delete')->middleware('throttle:30,1');
-    });
-
-    Route::middleware('auth:sanctum')->get('/user/menu', [MenusController::class,'getMenu']);
-
-    Route::prefix('frontend')->group(function () {
-        Route::controller(BlogsController::class)->group(function () {
-            Route::get('/blog', 'view');
-            Route::get('/blog/{slug}', 'details')->middleware('throttle:30,1');
-            Route::get('/blog-list/{id}', 'viewing')->middleware('throttle:30,1');
+        // ==================== EMPLOYEE PERMISSIONS ====================
+        Route::prefix('employee-permissions')->as('employee-permissions.')->group(function () {
+            Route::get('/roles', [EmployeePermissionController::class, 'getEmployeeRoles'])->name('roles');
+            Route::get('/matrix', [EmployeePermissionController::class, 'getEmployeePermissionMatrix'])->name('matrix');
+            Route::post('/assign/{roleId}', [EmployeePermissionController::class, 'assignToEmployeeRole'])->name('assign');
+            Route::get('/role/{roleId}/employees', [EmployeePermissionController::class, 'getEmployeesByRole'])->name('role.employees');
         });
+
+        // ==================== OPTIONS MANAGEMENT ====================
+        Route::prefix('options')->as('options.')->group(function () {
+            Route::get('/', [OptionController::class, 'fetchOption'])->name('index');
+            Route::post('/', [OptionController::class, 'store'])->name('store');
+            Route::get('/dropdown/{slug}/{module?}', [OptionController::class, 'getDropdownOptions'])->name('dropdown');
+            Route::get('/menu', [OptionController::class, 'optionMenu'])->name('menu');
+            Route::get('/show', [OptionController::class, 'showOption'])->name('show');
+            Route::get('/{id}', [OptionController::class, 'getOptionById'])->name('show');
+            Route::put('/{id}', [OptionController::class, 'update'])->name('update');
+            Route::delete('/{id}/{type}', [OptionController::class, 'destroy'])->name('destroy');
+            Route::patch('/status/{id}', [OptionController::class, 'updateStatus'])->name('status.update');
+        });
+
+        // ==================== PROPERTY MANAGEMENT ====================
+        Route::apiResource('properties', PropertyController::class);
+        Route::patch('properties/{id}/status', [PropertyController::class, 'updateStatus'])->name('properties.status.update');
+
+        // ==================== INQUIRY MANAGEMENT ====================
+        Route::prefix('inquiries')->as('inquiries.')->group(function () {
+            Route::apiResource('/', InqueryController::class)->parameters(['' => 'inquiry']);
+
+            // Inquiry follow-ups
+            Route::prefix('{inquiryId}/followups')->as('followups.')->group(function () {
+                Route::get('/', [InqueryFollowupController::class, 'index'])->name('index');
+                Route::post('/', [InqueryFollowupController::class, 'store'])->name('store');
+                Route::get('/{inquiryFollowup}', [InqueryFollowupController::class, 'show'])->name('show');
+                Route::put('/{inquiryFollowup}', [InqueryFollowupController::class, 'update'])->name('update');
+                Route::delete('/{id}', [InqueryFollowupController::class, 'destroy'])->name('destroy');
+            });
+        });
+
+        // ==================== FIELD VISITS ====================
+        Route::prefix('properties/{propertyId}/field-visits')->as('field-visits.')->group(function () {
+            Route::get('/', [FieldVisitsController::class, 'index'])->name('index');
+            Route::post('/', [FieldVisitsController::class, 'store'])->name('store');
+            Route::get('/{fieldVisit}', [FieldVisitsController::class, 'show'])->name('show');
+            Route::put('/{fieldVisit}', [FieldVisitsController::class, 'update'])->name('update');
+            Route::delete('/{id}', [FieldVisitsController::class, 'destroy'])->name('destroy');
+            Route::patch('/status/{id}', [FieldVisitsController::class, 'updateStatus'])->name('status.update');
+        });
+
+        // ==================== BLOG MANAGEMENT ====================
+        Route::prefix('blog')->as('blog.')->controller(BlogController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/', 'store')->middleware('throttle:10,1')->name('store');
+            Route::get('/{blogPost}', 'show')->middleware('throttle:30,1')->name('show');
+            Route::match(['put', 'patch'], '/{blogPost}', 'update')
+                ->middleware('throttle:10,1')
+                ->name('update');
+            Route::patch('/status/{blogPost}', 'updateStatus')
+                ->middleware('throttle:30,1')
+                ->name('status.update');
+            Route::delete('/{blogPost}', 'destroy')->middleware('throttle:30,1')->name('destroy');
+        });
+
+        // User menu
+        Route::get('/user/menu', [MenusController::class, 'getMenu'])->name('user.menu');
     });
 });
