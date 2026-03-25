@@ -77,10 +77,9 @@ class PropertyController extends BaseController  implements HasMiddleware
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
-    public function show(Property $property): Property
+    public function show(Property $property)
     {
-        return $property->load([
+        $property->load([
             'address',
             'images',
             'nearbyPlaces',
@@ -91,6 +90,12 @@ class PropertyController extends BaseController  implements HasMiddleware
             'houseDetails.roofType',
             'houseDetails.buildingFace',
         ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Property details fetched successfully',
+            'data' => $property,
+        ], 200);
     }
 
     public function update(Request $request, Property $property)
@@ -104,9 +109,8 @@ class PropertyController extends BaseController  implements HasMiddleware
         ]);
     }
 
-    public function destroy($id)
+    public function destroy(Property $property)
     {
-        $property = Property::findOrFail($id);
         $property->delete();
 
         return response()->json([
@@ -115,14 +119,13 @@ class PropertyController extends BaseController  implements HasMiddleware
         ]);
     }
 
-    public function updateStatus(Request $request, $id)
+    public function updateStatus(Request $request, Property $property)
     {
         $validated = $request->validate([
             'isStatus' => 'nullable|boolean',
             'is_status' => 'nullable|boolean',
         ]);
 
-        $property = Property::findOrFail($id);
         $property->is_status = $validated['is_status'] ?? $validated['isStatus'] ?? $property->is_status;
         $property->save();
 

@@ -117,15 +117,47 @@ class FrontController extends BaseController
 public function propertyList(Request $request)
 {
     try {
-        // Determine order
+        // Support a simple frontend sort contract and keep legacy order params working.
+        $allowedOrderFields = ['updated_at', 'created_at', 'advertise_price', 'land_area', 'title'];
+        $sort = strtolower((string) $request->get('sort', ''));
+        $orderByField = $request->get('order_by_field', 'updated_at');
         $orderBy = in_array(strtoupper($request->get('order_by')), ['ASC', 'DESC'])
             ? strtoupper($request->get('order_by'))
             : 'DESC';
-        
-        // Order by field (default to updated_at)
-        $orderByField = $request->get('order_by_field', 'updated_at');
-        $allowedOrderFields = ['updated_at', 'created_at', 'advertise_price', 'land_area', 'title'];
-        $orderByField = in_array($orderByField, $allowedOrderFields) ? $orderByField : 'updated_at';
+
+        switch ($sort) {
+            case 'latest':
+                $orderByField = 'updated_at';
+                $orderBy = 'DESC';
+                break;
+            case 'oldest':
+                $orderByField = 'created_at';
+                $orderBy = 'ASC';
+                break;
+            case 'price_low_to_high':
+            case 'price_asc':
+                $orderByField = 'advertise_price';
+                $orderBy = 'ASC';
+                break;
+            case 'price_high_to_low':
+            case 'price_desc':
+                $orderByField = 'advertise_price';
+                $orderBy = 'DESC';
+                break;
+            case 'title_asc':
+                $orderByField = 'title';
+                $orderBy = 'ASC';
+                break;
+            case 'title_desc':
+                $orderByField = 'title';
+                $orderBy = 'DESC';
+                break;
+            default:
+                $orderByField = in_array($orderByField, $allowedOrderFields, true)
+                    ? $orderByField
+                    : 'updated_at';
+                break;
+        }
 
         // Pagination parameters
         $limit = is_numeric($request->get('limit')) ? (int) $request->get('limit') : 10;

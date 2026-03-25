@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\PropertyController;
 use App\Http\Controllers\Api\V1\MenuController;
 use App\Http\Controllers\Api\V1\PermissionMatrixController;
@@ -37,7 +38,7 @@ Route::prefix('v1')->group(function () {
         // Property routes
         Route::prefix('properties')->as('properties.')->group(function () {
             Route::get('/summary', [FrontController::class, 'propertySummary'])->name('summary');
-            Route::get('/list', [InqueryController::class, 'propertyList'])->name('list');
+            Route::get('/list', [FrontController::class, 'propertyList'])->name('list');
             Route::get('/{slug}/details', [FrontController::class, 'propertyDetail'])->name('details');
         });
 
@@ -69,6 +70,11 @@ Route::prefix('v1')->group(function () {
         // User profile
         Route::get('/user', fn(Request $request) => $request->user())->name('user.profile');
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+        Route::get('/dashboard/summary', [DashboardController::class, 'summary'])->name('dashboard.summary');
+        Route::get('/dashboard/recent-properties', [DashboardController::class, 'recentProperties'])->name('dashboard.recent-properties');
+        Route::get('/dashboard/recent-activity', [DashboardController::class, 'recentActivity'])->name('dashboard.recent-activity');
+        Route::get('/dashboard/performance', [DashboardController::class, 'performance'])->name('dashboard.performance');
+        Route::get('/dashboard/report', [DashboardController::class, 'report'])->name('dashboard.report');
 
         // ==================== MENU MANAGEMENT ====================
         Route::prefix('menus')->as('menus.')->group(function () {
@@ -124,8 +130,14 @@ Route::prefix('v1')->group(function () {
         });
 
         // ==================== PROPERTY MANAGEMENT ====================
-        Route::apiResource('properties', PropertyController::class);
-        Route::patch('properties/{id}/status', [PropertyController::class, 'updateStatus'])->name('properties.status.update');
+        Route::prefix('properties')->as('properties.')->group(function () {
+            Route::get('/', [PropertyController::class, 'index'])->name('index');
+            Route::post('/', [PropertyController::class, 'store'])->name('store');
+            Route::get('/{property:id}', [PropertyController::class, 'show'])->name('show');
+            Route::match(['put', 'patch'], '/{property:id}', [PropertyController::class, 'update'])->name('update');
+            Route::delete('/{property:id}', [PropertyController::class, 'destroy'])->name('destroy');
+            Route::patch('/{property:id}/status', [PropertyController::class, 'updateStatus'])->name('status.update');
+        });
 
         // ==================== INQUIRY MANAGEMENT ====================
         Route::prefix('inquiries')->as('inquiries.')->group(function () {

@@ -2,11 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use DeepCopy\f013\C;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Str; // <-- Import Str
 
 class DatabaseSeeder extends Seeder
 {
@@ -53,10 +50,6 @@ class DatabaseSeeder extends Seeder
             RequestTypeSeeder::class,
             StatusSeeder::class,
             CategorySeeder::class,
-
-
-
-
         ]);
     }
 }
