@@ -4,8 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Property;
-use App\Models\Data\InquiryType;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use App\Models\Data\PropertyType;
 
 class Inquery extends Model
@@ -29,19 +30,24 @@ class Inquery extends Model
       
     ];
 
-    public function property()
+    public function property(): BelongsTo
     {
         return $this->belongsTo(Property::class);
     }
 
 
-    public function propertyType()
+    public function propertyType(): BelongsTo
     {
         return $this->belongsTo(PropertyType::class);
     }
 
-    public function inquiryFollowup()
+    public function inquiryFollowup(): HasMany
     {
-        return $this->hasMany(InqueryFollowup::class);
+        return $this->hasMany(InqueryFollowup::class, 'inquiry_id');
+    }
+
+    public function latestFollowup(): HasOne
+    {
+        return $this->hasOne(InqueryFollowup::class, 'inquiry_id')->latestOfMany();
     }
 }

@@ -46,11 +46,9 @@ class InqueryFollowupController extends BaseController
             ],
         ], 200);
     }
-    public function store(Request $request)
+    public function store(Request $request, int $inquiryId)
     {
         $validator = Validator::make($request->all(), [
-
-            'inquiry_id' => 'nullable|integer',
             'contact_method_id' => 'nullable|integer',
             'followup_status_id' => 'nullable|integer',
             'message' => 'nullable|string',
@@ -63,25 +61,9 @@ class InqueryFollowupController extends BaseController
             ], 422);
         }
 
-        $imagePaths = [];
-
-        if ($request->hasFile('images')) {
-
-            foreach ($request->file('images') as $image) {
-
-                $path = $image->store('request_posts', 'public');
-
-                $imagePaths[] = asset('storage/' . $path);
-            }
-        }
-
-
-        $inqueryFollowup = InqueryFollowup::create([
-            'inquiry_id' => $request->inquiry_id,
-            'contact_method_id' => $request->contact_method_id,
-            'followup_status_id' => $request->followup_status_id,
-            'message' => $request->message,
-            'next_followup_date' => $request->next_followup_date,
+        $inqueryFollowup = $this->inqueryFollowupService->store([
+            ...$validator->validated(),
+            'inquiry_id' => $inquiryId,
         ]);
 
         return response()->json([

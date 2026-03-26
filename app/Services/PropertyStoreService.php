@@ -7,14 +7,20 @@ use App\Models\Property;
 use App\Models\PropertyAddress;
 use App\Models\PropertyImages;
 use App\Models\HouseDetail;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Auth;
 
 class PropertyStoreService
 {
+    public function __construct(
+        private readonly AdminNotificationService $adminNotificationService,
+    ) {
+    }
+
     /**
      * Store a new property with all relationships
      *
@@ -24,6 +30,17 @@ class PropertyStoreService
     public function store(array $data): Property
     {
         return DB::transaction(function () use ($data) {
+            $currentUser = Auth::user();
+            $actorId = $currentUser?->id;
+
+            if ($actorId && empty($data['created_by'])) {
+                $data['created_by'] = $actorId;
+            }
+
+            if ($actorId) {
+                $data['updated_by'] = $actorId;
+            }
+
             // Create the property
             $property = $this->createProperty($data);
 
@@ -52,7 +69,7 @@ class PropertyStoreService
                 $this->attachNearbyPlaces($property, $data['nearby_places']);
             }
 
-            return $property->load([
+            $property = $property->load([
                  'address', 
                  'images', 
                  'nearbyPlaces',
@@ -63,6 +80,26 @@ class PropertyStoreService
                 'houseDetails.roofType',
                 'houseDetails.buildingFace'
             ]);
+
+            $propertyId = $property->id;
+
+            DB::afterCommit(function () use ($propertyId, $currentUser): void {
+                $freshProperty = Property::with([
+                    'createdBy',
+                    'propertyType',
+                    'listingType',
+                    'address',
+                ])->find($propertyId);
+
+                if ($freshProperty) {
+                    $this->adminNotificationService->notifyPropertyCreated(
+                        $freshProperty,
+                        $currentUser instanceof User ? $currentUser : null
+                    );
+                }
+            });
+
+            return $property;
         });
     }
 
@@ -76,6 +113,10 @@ class PropertyStoreService
     public function update(Property $property, array $data): Property
     {
         return DB::transaction(function () use ($property, $data) {
+            if (Auth::id()) {
+                $data['updated_by'] = Auth::id();
+            }
+
             // Update the property
             $property->update($this->extractPropertyData($data));
 
@@ -587,17 +628,27 @@ class PropertyStoreService
 
     public function listActiveProperty($request)
     {
-        $userId = Auth::id();
-
-        // Sorting
         $orderBy = in_array(strtoupper($request->get('order_by')), ['ASC', 'DESC'])
             ? strtoupper($request->get('order_by'))
             : 'DESC';
 
-        $orderColumn = $request->get('order_column') ?? 'created_at';
-        $orderColumn = Str::snake($orderColumn);
+        $allowedSortColumns = [
+            'created_at',
+            'updated_at',
+            'title',
+            'base_price',
+            'advertise_price',
+            'views_count',
+            'likes_count',
+            'status',
+            'is_status',
+        ];
 
-        // Pagination
+        $requestedOrderColumn = Str::snake($request->get('order_column') ?? 'created_at');
+        $orderColumn = in_array($requestedOrderColumn, $allowedSortColumns, true)
+            ? $requestedOrderColumn
+            : 'created_at';
+
         $limit = $request->get('limit');
         if (empty($limit) || $limit == 0) {
             $limit = $request->header('X-Limit-No') ?? 10;
@@ -606,21 +657,25 @@ class PropertyStoreService
         $limit = is_numeric($limit) ? (int) $limit : 10;
         $page  = is_numeric($request->get('page')) ? (int) $request->get('page') : 1;
 
-        // Allowed DB filters (snake_case)
-        $allowedFilters = ['category_id', 'vacancy_type', 'is_status', 'title'];
+        $allowedFilters = [
+            'property_category_id',
+            'property_type_id',
+            'listing_type_id',
+            'property_status_id',
+            'is_status',
+            'status',
+            'title',
+        ];
 
-        // Convert request inputs to snake_case
         $filters = collect($request->all())
             ->mapWithKeys(function ($value, $key) {
                 return [Str::snake($key) => $value];
             })
             ->only($allowedFilters)
-            ->filter(); // remove empty values
+            ->filter();
 
-        // Base Query
         $query = Property::with(['houseDetails','address','nearbyPlaces','images', 'landUnit', 'propertyFace', 'propertyType', 'listingType', 'measureUnit', 'roadType', 'roadCondition', 'waterSource', 'sewageType', 'propertyStatus', 'createdBy', 'updatedBy', 'verifiedBy']);
 
-        // Apply Filters
         foreach ($filters as $field => $value) {
             if ($field === 'title') {
                 $query->where($field, 'like', "%{$value}%");
@@ -629,7 +684,6 @@ class PropertyStoreService
             }
         }
 
-        // Apply Ordering
         $query->orderBy($orderColumn, $orderBy);
 
         return $query->paginate($limit, ['*'], 'page', $page);

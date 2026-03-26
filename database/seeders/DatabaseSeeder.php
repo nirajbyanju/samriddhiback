@@ -2,11 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use DeepCopy\f013\C;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Str; // <-- Import Str
 
 class DatabaseSeeder extends Seeder
 {
@@ -20,7 +17,12 @@ class DatabaseSeeder extends Seeder
         // User::factory(10)->create();
 
         $this->call([
-            PermissionMatrixSeeder::class,
+            MenuSeeder::class,
+            RolePermissionSeeder::class,
+            // PermissionsSeeder::class,
+            // PermissionMatrixSeeder::class,
+            UserSeeder::class,
+
 
             ConstructionStatusSeeder::class,
             FurnishingSeeder::class,
@@ -47,10 +49,7 @@ class DatabaseSeeder extends Seeder
             ContentMethodSeeder::class,
             RequestTypeSeeder::class,
             StatusSeeder::class,
-            CategorySeeder::class
-
-
-
+            CategorySeeder::class,
         ]);
     }
 }

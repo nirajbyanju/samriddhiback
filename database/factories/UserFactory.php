@@ -23,12 +23,21 @@ class UserFactory extends Factory
      */
     public function definition(): array
     {
+        $firstName = fake()->firstName();
+        $lastName = fake()->lastName();
+        $username = fake()->unique()->userName();
+
         return [
-            'name' => fake()->name(),
+            'userCode' => strtoupper(Str::random(10)),
+            'first_name' => $firstName,
+            'middle_name' => null,
+            'last_name' => $lastName,
+            'username' => $username,
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
-            'phone' => fake()->unique()->e164PhoneNumber(),
+            'phone' => '98' . str_pad((string) random_int(0, 99999999), 8, '0', STR_PAD_LEFT),
             'password' => static::$password ??= Hash::make('password'),
+            'status' => 1,
             'remember_token' => Str::random(10),
         ];
     }
@@ -42,7 +51,6 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
-
         ]);
     }
 }

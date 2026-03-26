@@ -2,68 +2,60 @@
 
 namespace App\Services;
 
-use App\Models\User;
-
 use App\Models\BlogPost;
+use App\Models\User;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
-use App\Notifications\UserNotification;
-use DateTime;
 
 class BlogService
 {
-
-    public function createBlog(array $data): BlogPost
+    public function create(array $data, ?UploadedFile $thumbnail = null): BlogPost
     {
         try {
-            // Fetch the user by the provided 'createdBy' ID
             $user = User::findOrFail($data['createdBy']);
             $userRoles = $user->roles()->pluck('name')->toArray();
 
-            // Set the default status
             $data['isStatus'] = 0;
             if (in_array('Admin', $userRoles) || in_array('Super Admin', $userRoles)) {
                 $data['isStatus'] = 1;
             }
 
-            $title = $data['title'] ?? ''; // Get the title
-            $baseSlug = Str::slug($title, '-'); // Generate the base slug
-            $slug = $baseSlug; // Initialize the slug with the base slug
+            $title = $data['title'] ?? '';
+            $baseSlug = Str::slug($title, '-');
+            $slug = $baseSlug;
 
-            // Find the latest ID and append it to the slug
-            $latestId = BlogPost::max('id'); // Get the latest ID from the BlogPost table
+            $latestId = BlogPost::max('id');
             if (!is_null($latestId)) {
-                $slug = $baseSlug . '-' . ($latestId + 1); // Append latest ID + 1 to the slug
+                $slug = $baseSlug . '-' . ($latestId + 1);
             }
+
             $filteredData = $this->filterData($data);
             $filteredData['slug'] = $slug;
 
-            if (request()->hasFile('thumbnail')) {
-                $filteredData['thumbnail'] = $this->handleFileUpload(request()->file('thumbnail'));
+            if ($thumbnail instanceof UploadedFile) {
+                $filteredData['thumbnail'] = $this->handleFileUpload($thumbnail);
             }
 
             $blogPost = BlogPost::create($filteredData);
-            $filteredData['content'] = \addHeadingIds($data['content']);
 
-            // Update the slug with the blog post ID appended at the end
             $blogPost->slug = $slug . '-' . $blogPost->id;
             $blogPost->save();
-            // $user->notify(new UserNotification("New Pop messgae added by {$user->first_name} {$user->last_name}"));
 
-            // Return the created blog post with its category
-            return BlogPost::with('category')->find($blogPost->id);
+            return $blogPost->load('category', 'user');
         } catch (\Exception $e) {
-            // Log the full error message and stack trace
-            Log::error("Error creating blog post: " . $e->getMessage());
-            Log::error("Stack trace: " . $e->getTraceAsString());
-
-            // Throw a custom exception or return a response with the error message
+            Log::error('Error creating blog post', [
+                'message' => $e->getMessage(),
+                'exception' => $e,
+            ]);
             throw new \Exception("Error creating blog post: " . $e->getMessage());
         }
     }
 
 
-    public function listActiveBlogPost($request)
+    public function list(Request $request): LengthAwarePaginator
     {
         $orderBy = in_array(strtoupper($request->get('order_by')), ['ASC', 'DESC']) ? strtoupper($request->get('order_by')) : 'DESC';
         $limit = is_numeric($request->get('limit')) ? $request->get('limit') : 10;
@@ -92,82 +84,72 @@ class BlogService
         }
 
         $query->orderBy('id', $orderBy);
-        // Paginate the results
         $paginatedResults = $query->paginate($limit, ['*'], 'page', $page);
-        // Return the paginated response
+
         return $paginatedResults;
     }
 
-    public function getBlogPostById($id)
+    public function show(BlogPost $blogPost): BlogPost
     {
-        return BlogPost::findorFail($id);
+        return $blogPost->load('category', 'user');
     }
 
 
-    public function getUpdateById(int $id, array $data): array
+    public function update(BlogPost $blogPost, array $data, ?UploadedFile $thumbnail = null): BlogPost
     {
-        $blogPost = BlogPost::find($id);
-
-        if (!$blogPost) {
-            return [
-                'message' => 'Blog post not found',
-                'status' => 404
-            ];
-        }
-
-        $filteredData = $this->filterData($data);
-        if (request()->hasFile('thumbnail') && request()->file('thumbnail')->isValid()) {
-            $filteredData['thumbnail'] = $this->handleFileUpload(request()->file('thumbnail'));
+        $filteredData = $this->filterData($data, true);
+        if ($thumbnail instanceof UploadedFile && $thumbnail->isValid()) {
+            $filteredData['thumbnail'] = $this->handleFileUpload($thumbnail);
         }
 
         $blogPost->update($filteredData);
 
-        return [
-            'message' => 'Blog post updated successfully'
-        ];
+        return $blogPost->fresh(['category', 'user']);
     }
 
-    public function getUpdateStatusById($id, $data)
+    public function updateStatus(BlogPost $blogPost, int $status): BlogPost
     {
-        $blogPost = BlogPost::findOrFail($id);
-        $blogPost->isStatus = $data['isStatus'];
+        $blogPost->is_status = $status;
         $blogPost->save();
-        return $blogPost;
+
+        return $blogPost->fresh(['category', 'user']);
     }
 
-    public function getDeleteById($id)
+    public function delete(BlogPost $blogPost): void
     {
-        $data = BlogPost::find($id);
+        $blogPost->delete();
+    }
 
-        if (!$data) {
-            return response()->json(['message' => 'data not found.'], 404);
+    private function filterData(array $data, bool $partial = false): array
+    {
+        $fieldMap = [
+            'title' => 'title',
+            'entry' => 'entry',
+            'author' => 'author',
+            'categoryId' => 'category_id',
+            'tags' => 'tags',
+            'content' => 'content',
+            'status' => 'status',
+            'isStatus' => 'is_status',
+            'scheduledPublishDate' => 'scheduled_publish_date',
+        ];
+
+        $filtered = [];
+
+        foreach ($fieldMap as $requestKey => $column) {
+            if (!$partial || array_key_exists($requestKey, $data)) {
+                $filtered[$column] = $data[$requestKey] ?? null;
+            }
         }
 
-        $data->delete();
+        if (!$partial) {
+            $filtered['publish_date'] = now();
+        }
 
-        return response()->json(['message' => 'Blog post deleted successfully.'], 200);
+        return $filtered;
     }
 
-    private function filterData(array $data): array
-    {
-        return [
-            'title' => $data['title'],
-            'entry' => $data['entry'] ?? null,
-            'author' => $data['author'] ?? null,
-            'category_id' => $data['categoryId'],
-            'tags' => $data['tags'],
-            'content' => $data['content'],
-            'status' => $data['status'],
-            'is_status' => $data['isStatus'],
-            'publish_date' => now(),
-            'scheduled_publish_date' => $data['scheduledPublishDate'] ?? null,
-            // 'view_count' => $data['viewCount'],
-            // 'like_count' => $data['likeCount'] ,
-            // 'bookmark_count' => $data['bookmarkCount'],
-        ];
-    }
-
-    private function handleFileUpload($file): string
+    private function handleFileUpload(UploadedFile $file): string
     {
         $extension = $file->getClientOriginalExtension();
         $filename = time() . '.' . $extension;

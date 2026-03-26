@@ -3,15 +3,18 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Notifications\Notifiable;
+use App\Models\UserDetail;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasApiTokens, Notifiable, HasRoles;
+    use HasFactory, HasApiTokens, Notifiable, HasRoles;
 
     /**
      * The attributes that are mass assignable.
@@ -19,6 +22,7 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
+        'userCode',
         'usercode',
         'first_name',
         'middle_name',
@@ -52,5 +56,40 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function setUsercodeAttribute($value): void
+    {
+        $this->attributes['userCode'] = $value;
+    }
+
+    public function getUsercodeAttribute(): ?string
+    {
+        return $this->attributes['userCode'] ?? null;
+    }
+
+    public function getDisplayNameAttribute(): string
+    {
+        $name = trim(implode(' ', array_filter([
+            $this->first_name,
+            $this->middle_name,
+            $this->last_name,
+        ])));
+
+        if ($name !== '') {
+            return $name;
+        }
+
+        return $this->username ?: $this->email;
+    }
+
+    public function receivesBroadcastNotificationsOn(): string
+    {
+        return 'users.'.$this->id;
+    }
+
+    public function userDetail(): HasOne
+    {
+        return $this->hasOne(UserDetail::class);
     }
 }

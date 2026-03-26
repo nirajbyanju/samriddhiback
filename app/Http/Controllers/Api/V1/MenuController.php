@@ -3,14 +3,22 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Api\V1\Concerns\AuthorizesRbacRequests;
 use App\Models\Menu;
+use App\Services\MenuPermissionService;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Validator;
-use Spatie\Permission\Models\Permission;
+use Illuminate\Validation\Rule;
 
 class MenuController extends Controller
 {
+    use AuthorizesRbacRequests;
+
+    public function __construct(
+        private readonly MenuPermissionService $menuPermissionService
+    ) {
+    }
   
     /**
      * Get menus based on user permissions
@@ -51,11 +59,8 @@ class MenuController extends Controller
      */
     public function index(Request $request)
     {
-        if (!$request->user()->can('view menus')) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized'
-            ], 403);
+        if ($response = $this->authorizeAnyAbility($request, ['view_menus', 'manage_all'])) {
+            return $response;
         }
 
         $menus = Menu::with(['parent', 'creator'])
@@ -72,15 +77,27 @@ class MenuController extends Controller
     }
 
     /**
+     * Show a single menu
+     */
+    public function show(Request $request, Menu $menu)
+    {
+        if ($response = $this->authorizeAnyAbility($request, ['view_menus', 'manage_all'])) {
+            return $response;
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $menu->load(['parent', 'children', 'creator']),
+        ]);
+    }
+
+    /**
      * Store a new menu
      */
     public function store(Request $request)
     {
-        if (!$request->user()->can('create menus')) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized'
-            ], 403);
+        if ($response = $this->authorizeAnyAbility($request, ['create_menus', 'manage_all'])) {
+            return $response;
         }
 
         $validator = Validator::make($request->all(), [
@@ -92,7 +109,11 @@ class MenuController extends Controller
             'order' => 'integer',
             'is_status' => 'boolean',
             'permission_name' => 'nullable|string|max:255',
-            'is_public' => 'boolean'
+            'is_public' => 'boolean',
+            'role_permissions' => 'sometimes|array',
+            'role_permissions.*.role_id' => 'required_with:role_permissions|exists:roles,id',
+            'role_permissions.*.actions' => 'sometimes|array',
+            'role_permissions.*.actions.*' => ['required', Rule::in(MenuPermissionService::supportedActions())],
         ]);
 
         if ($validator->fails()) {
@@ -104,23 +125,27 @@ class MenuController extends Controller
 
         $data = $request->all();
         $data['created_by'] = $request->user()->id;
+        unset($data['role_permissions']);
 
         $menu = Menu::create($data);
 
-        // Create corresponding permission if needed
-        if (!$menu->is_public && empty($menu->permission_name)) {
-            $permissionName = "view menu-{$menu->id}";
-            Permission::firstOrCreate([
-                'name' => $permissionName,
-                'guard_name' => 'web'
-            ]);
-            $menu->update(['permission_name' => $permissionName]);
+        if (!$menu->is_public || !empty($menu->permission_name)) {
+            $generatedPermissions = $this->menuPermissionService->ensureForMenu($menu);
+        } else {
+            $generatedPermissions = [];
+        }
+
+        if ($request->filled('role_permissions')) {
+            $this->menuPermissionService->syncRoles($menu, $request->input('role_permissions', []));
         }
 
         return response()->json([
             'success' => true,
             'message' => 'Menu created successfully',
-            'data' => $menu->load('parent')
+            'data' => [
+                'menu' => $menu->load('parent'),
+                'generated_permissions' => $generatedPermissions,
+            ]
         ], 201);
     }
 
@@ -129,11 +154,8 @@ class MenuController extends Controller
      */
     public function update(Request $request, Menu $menu)
     {
-        if (!$request->user()->can('edit menus')) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized'
-            ], 403);
+        if ($response = $this->authorizeAnyAbility($request, ['edit_menus', 'manage_all'])) {
+            return $response;
         }
 
         $validator = Validator::make($request->all(), [
@@ -145,7 +167,11 @@ class MenuController extends Controller
             'order' => 'integer',
             'is_status' => 'boolean',
             'permission_name' => 'nullable|string|max:255',
-            'is_public' => 'boolean'
+            'is_public' => 'boolean',
+            'role_permissions' => 'sometimes|array',
+            'role_permissions.*.role_id' => 'required_with:role_permissions|exists:roles,id',
+            'role_permissions.*.actions' => 'sometimes|array',
+            'role_permissions.*.actions.*' => ['required', Rule::in(MenuPermissionService::supportedActions())],
         ]);
 
         if ($validator->fails()) {
@@ -155,12 +181,66 @@ class MenuController extends Controller
             ], 422);
         }
 
-        $menu->update($request->all());
+        $oldPermissionBase = $menu->permission_name;
+        $data = $request->all();
+        unset($data['role_permissions']);
+        $menu->update($data);
+
+        if (!$menu->is_public || !empty($menu->permission_name)) {
+            $generatedPermissions = $this->menuPermissionService->ensureForMenu($menu, $oldPermissionBase);
+        } else {
+            $generatedPermissions = [];
+        }
+
+        if ($request->filled('role_permissions')) {
+            $this->menuPermissionService->syncRoles($menu, $request->input('role_permissions', []));
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Menu updated successfully',
-            'data' => $menu->fresh(['parent'])
+            'data' => [
+                'menu' => $menu->fresh(['parent']),
+                'generated_permissions' => $generatedPermissions,
+            ]
+        ]);
+    }
+
+    /**
+     * Sync role permissions for a menu
+     */
+    public function syncRolePermissions(Request $request, Menu $menu)
+    {
+        if ($response = $this->authorizeAnyAbility($request, ['edit_menus', 'edit_roles', 'manage_all'])) {
+            return $response;
+        }
+
+        $validator = Validator::make($request->all(), [
+            'role_permissions' => 'required|array',
+            'role_permissions.*.role_id' => 'required|exists:roles,id',
+            'role_permissions.*.actions' => 'sometimes|array',
+            'role_permissions.*.actions.*' => ['required', Rule::in(MenuPermissionService::supportedActions())],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $generatedPermissions = $this->menuPermissionService->syncRoles(
+            $menu,
+            $request->input('role_permissions', [])
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Menu permissions synced to roles successfully.',
+            'data' => [
+                'menu' => $menu->fresh(['parent']),
+                'generated_permissions' => $generatedPermissions,
+            ]
         ]);
     }
 
@@ -169,11 +249,8 @@ class MenuController extends Controller
      */
     public function destroy(Request $request, Menu $menu)
     {
-        if (!$request->user()->can('delete menus')) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized'
-            ], 403);
+        if ($response = $this->authorizeAnyAbility($request, ['delete_menus', 'manage_all'])) {
+            return $response;
         }
 
         // Check if has children
@@ -184,6 +261,7 @@ class MenuController extends Controller
             ], 422);
         }
 
+        $this->menuPermissionService->deleteForMenu($menu);
         $menu->delete();
 
         return response()->json([
@@ -197,11 +275,8 @@ class MenuController extends Controller
      */
     public function reorder(Request $request)
     {
-        if (!$request->user()->can('edit menus')) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized'
-            ], 403);
+        if ($response = $this->authorizeAnyAbility($request, ['edit_menus', 'manage_all'])) {
+            return $response;
         }
 
         $validator = Validator::make($request->all(), [

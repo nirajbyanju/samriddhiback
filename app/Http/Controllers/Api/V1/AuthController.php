@@ -12,27 +12,23 @@ use Illuminate\Http\JsonResponse;
 use App\Http\Requests\RegisterUserRequest;
 use Illuminate\Support\Facades\Hash;
 use App\Services\RegistrationService;
-use Illuminate\Support\Facades\Log;
-use App\Jobs\SenEmailJob;
-use Illuminate\Support\Str;
-use App\Notifications\UserNotification;
-use App\Services\MenuService;
+use App\Services\UserMenuService;
 use Carbon\Carbon;
 use App\Models\RefreshToken;
-use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class AuthController extends BaseController
 {
-    protected $registrationService;
-    protected $menuService;
+    protected RegistrationService $registrationService;
+    protected UserMenuService $userMenuService;
 
 
     public function __construct(
         RegistrationService $registrationService,
+        UserMenuService $userMenuService,
     ) {
         $this->registrationService = $registrationService;
+        $this->userMenuService = $userMenuService;
     }
 
 
@@ -46,6 +42,7 @@ class AuthController extends BaseController
             'data' => [
                 'token' => $userData['token'],
                 'name' => $userData['name'],
+                'roles' => $userData['roles'],
             ],
             'message' => 'User registered successfully.',
         ], 201);
@@ -55,12 +52,12 @@ class AuthController extends BaseController
     {
         // Use the service to register the user
         $userData = $this->registrationService->registerAdmin($request->all());
-        $userData['roles'] = ['admin'];
         return response()->json([
             'success' => true,
             'data' => [
                 'token' => $userData['token'],
                 'name' => $userData['name'],
+                'roles' => $userData['roles'],
             ],
             'message' => 'User registered successfully.',
         ], 201);
@@ -105,17 +102,18 @@ class AuthController extends BaseController
         $user = Auth::user();
 
         // Now check status and verification
-        // if ($user->status == 0) {
-        //     Auth::logout();
-        //     return response()->json([
-        //         'error' => [
-        //             'status' => 'error',
-        //             'validationErrors' => [
-        //                 'email' => ['The account is inactive or disabled.']
-        //             ],
-        //         ],
-        //     ], 404);
-        // }
+        if ((int) $user->status === 0) {
+            Auth::logout();
+
+            return response()->json([
+                'error' => [
+                    'status' => 'error',
+                    'validationErrors' => [
+                        'email' => ['The account is inactive or disabled.']
+                    ],
+                ],
+            ], 403);
+        }
 
         if ($user->email_verified_at == null) {
             Auth::logout();
@@ -131,11 +129,8 @@ class AuthController extends BaseController
         // Load relationships only when needed
         $user->load('roles');
 
-        $accessToken = $user->createToken('auth-token', ['*'], Carbon::now()->addDay())->plainTextToken;
+        $accessToken = $user->createToken('auth-token', ['*'], Carbon::now()->addHour())->plainTextToken;
         $refreshToken = RefreshToken::createForUser($user);
-
-        // Consider caching menu data
-
 
         $result = [
             'token' => $accessToken,
@@ -150,6 +145,7 @@ class AuthController extends BaseController
                 'email' => $user->email,
                 'roles' => $user->roles->pluck('name'),
             ],
+            'menus' => $this->userMenuService->getForUser($user),
         ];
 
         return response()->json([
@@ -160,84 +156,103 @@ class AuthController extends BaseController
     }
 
     public function refreshToken(Request $request): JsonResponse
-{
-    $refreshToken = $request->input('refresh_token');
+    {
+        $refreshToken = $request->input('refresh_token');
 
-    if (!$refreshToken) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Refresh token is required'
-        ], 422);
-    }
+        if (!$refreshToken) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Refresh token is required'
+            ], 422);
+        }
 
-    $tokenModel = RefreshToken::where('token', $refreshToken)->first();
+        $tokenModel = RefreshToken::where('token', $refreshToken)->first();
 
-    if (!$tokenModel) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Invalid or expired refresh token'
-        ], 401);
-    }
+        if (!$tokenModel) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid or expired refresh token'
+            ], 401);
+        }
 
-    $user = $tokenModel->user;
+        if ($tokenModel->isExpired()) {
+            $tokenModel->delete();
 
-    if (!$user) {
-        return response()->json([
-            'success' => false,
-            'message' => 'User not found'
-        ], 404);
-    }
+            return response()->json([
+                'success' => false,
+                'message' => 'Refresh token has expired'
+            ], 401);
+        }
 
-    DB::beginTransaction();
+        $user = $tokenModel->user;
 
-    try {
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found'
+            ], 404);
+        }
 
-        // Delete old access tokens
-        $user->tokens()->delete();
+        if ((int) $user->status === 0) {
+            $tokenModel->delete();
 
-        // Delete used refresh token (important for security)
-        $tokenModel->delete();
+            return response()->json([
+                'success' => false,
+                'message' => 'The account is inactive or disabled'
+            ], 403);
+        }
 
-        // Create new access token (1 hour expiry recommended)
-        $accessToken = $user->createToken(
-            'auth-token',
-            ['*'],
-            Carbon::now()->addHour()
-        )->plainTextToken;
+        DB::beginTransaction();
 
-        // Create new refresh token
-        $newRefreshToken = RefreshToken::createForUser($user);
+        try {
+            $user->loadMissing('roles');
 
-        DB::commit();
+            // Delete old access tokens
+            $user->tokens()->delete();
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'access_token' => $accessToken,
-                'refresh_token' => $newRefreshToken->token,
-                'expires_in' => 3600,
-                'token_type' => 'Bearer',
-                'user' => [
-                    'id' => $user->id,
-                    'firstName' => $user->first_name,
-                    'lastName' => $user->last_name,
-                    'userName' => $user->username,
-                    'email' => $user->email,
-                    'roles' => $user->roles->pluck('name'),
+            // Delete used refresh token (important for security)
+            $tokenModel->delete();
+
+            // Create new access token (1 hour expiry recommended)
+            $accessToken = $user->createToken(
+                'auth-token',
+                ['*'],
+                Carbon::now()->addHour()
+            )->plainTextToken;
+
+            // Create new refresh token
+            $newRefreshToken = RefreshToken::createForUser($user);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'access_token' => $accessToken,
+                    'refresh_token' => $newRefreshToken->token,
+                    'expires_in' => 3600,
+                    'token_type' => 'Bearer',
+                    'user' => [
+                        'id' => $user->id,
+                        'firstName' => $user->first_name,
+                        'lastName' => $user->last_name,
+                        'userName' => $user->username,
+                        'email' => $user->email,
+                        'roles' => $user->roles->pluck('name'),
+                    ],
+                    'menus' => $this->userMenuService->getForUser($user),
                 ],
-            ],
-            'message' => 'Token refreshed successfully.'
-        ], 200);
+                'message' => 'Token refreshed successfully.'
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
 
-    } catch (\Exception $e) {
-        DB::rollBack();
-
-        return response()->json([
-            'success' => false,
-            'message' => 'Token refresh failed'
-        ], 500);
+            return response()->json([
+                'success' => false,
+                'message' => 'Token refresh failed'
+            ], 500);
+        }
     }
-}
     public function sendResetLinkEmail(Request $request)
     {
         try {

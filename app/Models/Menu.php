@@ -12,6 +12,8 @@ use App\Models\User;
 class Menu extends Model
 {
    use HasFactory, SoftDeletes, Auditable;
+
+    protected $table = 'menus';
     
     protected $fillable = [
         'name',
@@ -62,6 +64,39 @@ class Menu extends Model
               ->orWhereIn('permission_name', $user->getAllPermissions()->pluck('name'));
         });
     }
+
+    public function permissionVariants(?string $action = null): array
+    {
+        if (empty($this->permission_name)) {
+            return [];
+        }
+
+        $base = trim($this->permission_name);
+        $variants = [$base];
+
+        if ($action !== null) {
+            $action = trim($action);
+            $variants[] = "{$action}_{$base}";
+            $variants[] = "{$action} {$base}";
+        }
+
+        return array_values(array_unique($variants));
+    }
+
+    public function allowsAction(User $user, string $action): bool
+    {
+        if ($user->hasRole('Super Admin')) {
+            return true;
+        }
+
+        foreach ($this->permissionVariants($action) as $permissionName) {
+            if ($user->can($permissionName)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
     
     // Helper method to check if menu is accessible
     public function isAccessibleBy(User $user): bool
@@ -71,9 +106,11 @@ class Menu extends Model
         }
 
         if (!empty($this->permission_name)) {
-            return $user->hasPermissionTo($this->permission_name);
+            if ($this->allowsAction($user, 'manage') || $this->allowsAction($user, 'view')) {
+                return true;
+            }
         }
 
-        return $this->is_public ?? false;
+        return (bool) ($this->is_public ?? false);
     }
 }
