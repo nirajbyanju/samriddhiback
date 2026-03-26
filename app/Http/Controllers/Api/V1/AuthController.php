@@ -74,6 +74,7 @@ class AuthController extends BaseController
         $request->validate([
             'email' => 'required|email',
             'password' => 'required',
+            'device_name' => 'nullable|string|max:100',
         ]);
 
         if (!User::where('email', $request->email)->first()) {
@@ -129,44 +130,32 @@ class AuthController extends BaseController
         // Load relationships only when needed
         $user->load('roles');
 
-        $accessToken = $user->createToken('auth-token', ['*'], Carbon::now()->addHour())->plainTextToken;
-        $refreshToken = RefreshToken::createForUser($user);
+        $deviceName = $this->resolveDeviceName($request);
 
-        $result = [
-            'token' => $accessToken,
-            'refresh_token' => $refreshToken->token,
-            'expires_in' => 3600,
-            'token_type' => 'Bearer',
-            'user' => [
-                'id' => $user->id,
-                'firstName' => $user->first_name,
-                'lastName' => $user->last_name,
-                'userName' => $user->username,
-                'email' => $user->email,
-                'roles' => $user->roles->pluck('name'),
-            ],
-            'menus' => $this->userMenuService->getForUser($user),
-        ];
+        RefreshToken::revokeDeviceSessionsForUser($user, $deviceName);
+
+        [$accessToken, $refreshToken, $accessTokenExpiresAt] = $this->createSessionTokens(
+            $user,
+            $deviceName,
+            $request->userAgent(),
+            $request->ip(),
+        );
 
         return response()->json([
             'success' => true,
-            'data' => $result,
+            'data' => $this->buildTokenPayload($user, $accessToken, $refreshToken, $accessTokenExpiresAt),
             'message' => 'User logged in successfully.',
         ], 200);
     }
 
     public function refreshToken(Request $request): JsonResponse
     {
-        $refreshToken = $request->input('refresh_token');
+        $validated = $request->validate([
+            'refresh_token' => 'required|string',
+            'device_name' => 'nullable|string|max:100',
+        ]);
 
-        if (!$refreshToken) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Refresh token is required'
-            ], 422);
-        }
-
-        $tokenModel = RefreshToken::where('token', $refreshToken)->first();
+        $tokenModel = RefreshToken::where('token', $validated['refresh_token'])->first();
 
         if (!$tokenModel) {
             return response()->json([
@@ -202,46 +191,38 @@ class AuthController extends BaseController
             ], 403);
         }
 
+        if ($user->email_verified_at === null) {
+            $tokenModel->delete();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Email is not verified'
+            ], 403);
+        }
+
         DB::beginTransaction();
 
         try {
             $user->loadMissing('roles');
+            $deviceName = $this->resolveDeviceName($request, $tokenModel);
+            $userAgent = $request->userAgent() ?: $tokenModel->user_agent;
+            $ipAddress = $request->ip() ?: $tokenModel->ip_address;
 
-            // Delete old access tokens
-            $user->tokens()->delete();
-
-            // Delete used refresh token (important for security)
+            $tokenModel->accessToken?->delete();
             $tokenModel->delete();
 
-            // Create new access token (1 hour expiry recommended)
-            $accessToken = $user->createToken(
-                'auth-token',
-                ['*'],
-                Carbon::now()->addHour()
-            )->plainTextToken;
-
-            // Create new refresh token
-            $newRefreshToken = RefreshToken::createForUser($user);
+            [$accessToken, $newRefreshToken, $accessTokenExpiresAt] = $this->createSessionTokens(
+                $user,
+                $deviceName,
+                $userAgent,
+                $ipAddress,
+            );
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'data' => [
-                    'access_token' => $accessToken,
-                    'refresh_token' => $newRefreshToken->token,
-                    'expires_in' => 3600,
-                    'token_type' => 'Bearer',
-                    'user' => [
-                        'id' => $user->id,
-                        'firstName' => $user->first_name,
-                        'lastName' => $user->last_name,
-                        'userName' => $user->username,
-                        'email' => $user->email,
-                        'roles' => $user->roles->pluck('name'),
-                    ],
-                    'menus' => $this->userMenuService->getForUser($user),
-                ],
+                'data' => $this->buildTokenPayload($user, $accessToken, $newRefreshToken, $accessTokenExpiresAt),
                 'message' => 'Token refreshed successfully.'
             ], 200);
         } catch (\Exception $e) {
@@ -436,19 +417,87 @@ class AuthController extends BaseController
                 return $this->sendError('Unauthenticated user', 401);
             }
 
-            // Delete user's personal access tokens if they exist
-            if (method_exists($user, 'tokens')) {
+            $logoutAllDevices = $request->boolean('all_devices');
+            $currentAccessToken = method_exists($user, 'currentAccessToken')
+                ? $user->currentAccessToken()
+                : null;
+
+            if ($logoutAllDevices || !$currentAccessToken) {
                 $user->tokens()->delete();
+                RefreshToken::where('user_id', $user->id)->delete();
+            } else {
+                RefreshToken::where('personal_access_token_id', $currentAccessToken->id)->delete();
+                $currentAccessToken->delete();
             }
-
-            // Delete refresh tokens from DB if they exist
-
-            RefreshToken::where('user_id', $user->id)->delete();
 
             return $this->sendResponse([], 'Logged out successfully');
         } catch (\Exception $e) {
             // Optional: Log the error for debugging
             return $this->sendError('Error logging out', 500);
         }
+    }
+
+    private function createSessionTokens(
+        User $user,
+        string $deviceName,
+        ?string $userAgent,
+        ?string $ipAddress,
+    ): array {
+        $accessTokenExpiresAt = Carbon::now()->addHour();
+        $newAccessToken = $user->createToken($deviceName, ['*'], $accessTokenExpiresAt);
+        $refreshToken = RefreshToken::createForUser(
+            $user,
+            $newAccessToken->accessToken,
+            $deviceName,
+            $userAgent,
+            $ipAddress,
+        );
+
+        return [$newAccessToken->plainTextToken, $refreshToken, $accessTokenExpiresAt];
+    }
+
+    private function buildTokenPayload(
+        User $user,
+        string $accessToken,
+        RefreshToken $refreshToken,
+        Carbon $accessTokenExpiresAt,
+    ): array {
+        $user->loadMissing('roles');
+
+        return [
+            'token' => $accessToken,
+            'access_token' => $accessToken,
+            'refresh_token' => $refreshToken->token,
+            'expires_in' => now()->diffInSeconds($accessTokenExpiresAt, false),
+            'access_token_expires_at' => $accessTokenExpiresAt->toISOString(),
+            'refresh_token_expires_at' => $refreshToken->expires_at?->toISOString(),
+            'token_type' => 'Bearer',
+            'device_name' => $refreshToken->device_name,
+            'user' => [
+                'id' => $user->id,
+                'firstName' => $user->first_name,
+                'lastName' => $user->last_name,
+                'userName' => $user->username,
+                'email' => $user->email,
+                'roles' => $user->roles->pluck('name'),
+            ],
+            'menus' => $this->userMenuService->getForUser($user),
+        ];
+    }
+
+    private function resolveDeviceName(Request $request, ?RefreshToken $refreshToken = null): string
+    {
+        $deviceName = trim((string) (
+            $request->input('device_name')
+            ?: $refreshToken?->device_name
+            ?: $request->userAgent()
+            ?: 'web-client'
+        ));
+
+        if ($deviceName === '') {
+            return 'web-client';
+        }
+
+        return mb_substr($deviceName, 0, 100);
     }
 }
