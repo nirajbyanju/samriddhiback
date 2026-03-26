@@ -42,6 +42,7 @@ class AuthController extends BaseController
             'data' => [
                 'token' => $userData['token'],
                 'name' => $userData['name'],
+                'roles' => $userData['roles'],
             ],
             'message' => 'User registered successfully.',
         ], 201);
@@ -51,12 +52,12 @@ class AuthController extends BaseController
     {
         // Use the service to register the user
         $userData = $this->registrationService->registerAdmin($request->all());
-        $userData['roles'] = ['admin'];
         return response()->json([
             'success' => true,
             'data' => [
                 'token' => $userData['token'],
                 'name' => $userData['name'],
+                'roles' => $userData['roles'],
             ],
             'message' => 'User registered successfully.',
         ], 201);
@@ -101,17 +102,18 @@ class AuthController extends BaseController
         $user = Auth::user();
 
         // Now check status and verification
-        // if ($user->status == 0) {
-        //     Auth::logout();
-        //     return response()->json([
-        //         'error' => [
-        //             'status' => 'error',
-        //             'validationErrors' => [
-        //                 'email' => ['The account is inactive or disabled.']
-        //             ],
-        //         ],
-        //     ], 404);
-        // }
+        if ((int) $user->status === 0) {
+            Auth::logout();
+
+            return response()->json([
+                'error' => [
+                    'status' => 'error',
+                    'validationErrors' => [
+                        'email' => ['The account is inactive or disabled.']
+                    ],
+                ],
+            ], 403);
+        }
 
         if ($user->email_verified_at == null) {
             Auth::logout();
@@ -189,6 +191,15 @@ class AuthController extends BaseController
                 'success' => false,
                 'message' => 'User not found'
             ], 404);
+        }
+
+        if ((int) $user->status === 0) {
+            $tokenModel->delete();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'The account is inactive or disabled'
+            ], 403);
         }
 
         DB::beginTransaction();

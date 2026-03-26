@@ -15,6 +15,8 @@ use App\Http\Controllers\Api\V1\InqueryController;
 use App\Http\Controllers\Api\V1\InqueryFollowupController;
 use App\Http\Controllers\Api\V1\FieldVisitsController;
 use App\Http\Controllers\Api\V1\BlogController;
+use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\UserProfileController;
 use App\Http\Controllers\Api\V1\Frontend\BlogsController;
 use App\Http\Controllers\Api\V1\RoleController;
 use App\Http\Controllers\Api\V1\UserAccessController;
@@ -68,13 +70,23 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
 
         // User profile
-        Route::get('/user', fn(Request $request) => $request->user())->name('user.profile');
+        Route::get('/user', [UserProfileController::class, 'show'])->name('user.profile');
+        Route::match(['put', 'patch'], '/user', [UserProfileController::class, 'update'])->name('user.update');
+        Route::post('/user/profile-picture', [UserProfileController::class, 'updateProfilePicture'])->name('user.profile-picture.update');
+        Route::delete('/user/profile-picture', [UserProfileController::class, 'deleteProfilePicture'])->name('user.profile-picture.delete');
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
         Route::get('/dashboard/summary', [DashboardController::class, 'summary'])->name('dashboard.summary');
         Route::get('/dashboard/recent-properties', [DashboardController::class, 'recentProperties'])->name('dashboard.recent-properties');
         Route::get('/dashboard/recent-activity', [DashboardController::class, 'recentActivity'])->name('dashboard.recent-activity');
         Route::get('/dashboard/performance', [DashboardController::class, 'performance'])->name('dashboard.performance');
         Route::get('/dashboard/report', [DashboardController::class, 'report'])->name('dashboard.report');
+
+        Route::prefix('notifications')->as('notifications.')->group(function () {
+            Route::get('/', [NotificationController::class, 'index'])->name('index');
+            Route::get('/unread-count', [NotificationController::class, 'unreadCount'])->name('unread-count');
+            Route::patch('/read-all', [NotificationController::class, 'markAllAsRead'])->name('read-all');
+            Route::patch('/{notificationId}/read', [NotificationController::class, 'markAsRead'])->name('read');
+        });
 
         // ==================== MENU MANAGEMENT ====================
         Route::prefix('menus')->as('menus.')->group(function () {
@@ -91,7 +103,9 @@ Route::prefix('v1')->group(function () {
 
             Route::prefix('users')->as('users.')->group(function () {
                 Route::get('/', [UserAccessController::class, 'index'])->name('index');
+                Route::post('/', [UserAccessController::class, 'store'])->name('store');
                 Route::get('/{user}/access', [UserAccessController::class, 'show'])->name('show');
+                Route::patch('/{user}/status', [UserAccessController::class, 'updateStatus'])->name('status.update');
                 Route::put('/{user}/roles', [UserAccessController::class, 'syncRoles'])->name('roles.sync');
                 Route::put('/{user}/permissions', [UserAccessController::class, 'syncPermissions'])->name('permissions.sync');
             });

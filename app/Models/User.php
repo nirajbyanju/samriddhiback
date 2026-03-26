@@ -7,7 +7,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Notifications\Notifiable;
+use App\Models\UserDetail;
 
 class User extends Authenticatable
 {
@@ -64,5 +66,30 @@ class User extends Authenticatable
     public function getUsercodeAttribute(): ?string
     {
         return $this->attributes['userCode'] ?? null;
+    }
+
+    public function getDisplayNameAttribute(): string
+    {
+        $name = trim(implode(' ', array_filter([
+            $this->first_name,
+            $this->middle_name,
+            $this->last_name,
+        ])));
+
+        if ($name !== '') {
+            return $name;
+        }
+
+        return $this->username ?: $this->email;
+    }
+
+    public function receivesBroadcastNotificationsOn(): string
+    {
+        return 'users.'.$this->id;
+    }
+
+    public function userDetail(): HasOne
+    {
+        return $this->hasOne(UserDetail::class);
     }
 }

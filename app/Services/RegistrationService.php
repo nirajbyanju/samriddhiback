@@ -4,157 +4,104 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Models\UserDetail;
-use App\Events\UserRegistered;
-use Illuminate\Support\Facades\Hash;
-use App\Models\RoleUser;
-use App\Notifications\UserNotification;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class RegistrationService
 {
-
-    // public function registerUser(array $data)
-    // {
-    //     // Generate a user code
-    //     $currentYear = now()->year;
-    //     $latestId = User::max('id') + 1;
-    //     $userCode = "Opsh-{$currentYear}-{$latestId}";
-
-    //     // Map the input fields to the database columns
-    //     $mappedData = [
-    //        'name' => $data['name'],
-    //         'email' => $data['email'],
-    //         'phone' => $data['phone'],
-    //         'password' => Hash::make($data['password']),
-    //     ];
-
-    //     // Create the user
-    //     $user = User::create($mappedData);
-    //     // UserDetail::create(['user_id' => $user->id]);
-    //     $user->roles()->attach(5);
-
-
-    //     // Dispatch the events
-    //     // UserRegistered::dispatch($user);
-    //     // $user->notify(new UserNotification("New user has been registered as {$user->first_name} {$user->last_name}"));
-    //     $user->sendEmailVerificationNotification();
-
-    //     // Return the token and user details
-    //     $token = $user->createToken('MyApp')->plainTextToken;
-    //     return [
-    //         'token' => $token,
-    //         'name' => $user->first_name . ' ' . $user->last_name,
-    //     ];
-    // }
-
-    public function registerUser(array $data)
-    {
-        DB::beginTransaction();
-
-        try {
-
-            // Generate a user code
-            $currentYear = now()->year;
-            $latestId = User::max('id') + 1;
-            $userCode = "Opsh-{$currentYear}-{$latestId}";
-
-            $nameParts = explode(' ', trim($data['name']));
-
-            $firstName = $nameParts[0] ?? null;
-            $lastName = count($nameParts) > 1 ? end($nameParts) : null;
-
-            // Middle name (everything except first and last)
-            if (count($nameParts) > 2) {
-                $middleName = implode(' ', array_slice($nameParts, 1, -1));
-            } else {
-                $middleName = null;
-            }
-            $baseUsername = strtolower(str_replace(' ', '', $data['name']));
-            $username = $baseUsername;
-            $counter = 1;
-
-            // Check uniqueness
-            while (User::where('username', $username)->exists()) {
-                $username = $baseUsername . $counter;
-                $counter++;
-            }
-
-            $mappedData = [
-                'first_name' => $firstName,
-                'middle_name' => $middleName,
-                'last_name' => $lastName,
-                'username' => $username,
-                'email' => $data['email'],
-                'phone' => $data['phone'],
-                'password' => Hash::make($data['password']),
-            ];
-
-            // Create User
-            $user = User::create($mappedData);
-            UserDetail::create(['user_id' => $user->id]);
-
-            // ✅ Assign role properly (DO NOT use hardcoded ID)
-            $user->assignRole('user'); // make sure this role exists
-
-            // Send email verification
-            // $user->sendEmailVerificationNotification();
-
-            // Create token
-            $token = $user->createToken('MyApp')->plainTextToken;
-
-            DB::commit();
-
-            return [
-                'token' => $token,
-                'name' => $user->name,
-            ];
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
+    public function __construct(
+        private readonly AdminNotificationService $adminNotificationService,
+    ) {
     }
 
-
-    public function registerAdmin(array $data)
+    public function registerUser(array $data): array
     {
-        DB::beginTransaction();
+        return $this->register($data, 'Employee');
+    }
 
-        try {
+    public function registerAdmin(array $data): array
+    {
+        return $this->register($data, 'Admin');
+    }
 
-            // Generate a user code
-            $currentYear = now()->year;
-            $latestId = User::max('id') + 1;
-            $userCode = "Opsh-{$currentYear}-{$latestId}";
+    protected function register(array $data, string $roleName): array
+    {
+        return DB::transaction(function () use ($data, $roleName) {
+            $user = User::create($this->buildUserData($data));
 
-            $mappedData = [
-                'name' => $data['name'],
-                'email' => $data['email'],
-                'phone' => $data['phone'],
-                'password' => Hash::make($data['password']),
-            ];
+            UserDetail::create([
+                'user_id' => $user->id,
+            ]);
 
-            // Create User
-            $user = User::create($mappedData);
-            UserDetail::create(['user_id' => $user->id]);
+            $user->syncRoles([$roleName]);
+            $user->load('roles');
 
-            // ✅ Assign role properly (DO NOT use hardcoded ID)
-            $user->assignRole('admin'); // make sure this role exists
+            DB::afterCommit(function () use ($user): void {
+                $freshUser = $user->fresh('roles');
 
-            // Send email verification
-            // $user->sendEmailVerificationNotification();
-
-            // Create token
-            $token = $user->createToken('MyApp')->plainTextToken;
-
-            DB::commit();
+                if ($freshUser) {
+                    $this->adminNotificationService->notifyNewRegistration($freshUser);
+                }
+            });
 
             return [
-                'token' => $token,
-                'name' => $user->name,
+                'token' => $user->createToken('MyApp')->plainTextToken,
+                'name' => $user->display_name,
+                'roles' => $user->roles->pluck('name')->values()->all(),
             ];
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
+        });
+    }
+
+    protected function buildUserData(array $data): array
+    {
+        [$firstName, $middleName, $lastName] = $this->splitName($data['name']);
+
+        return [
+            'userCode' => $this->generateUserCode(),
+            'first_name' => $firstName,
+            'middle_name' => $middleName,
+            'last_name' => $lastName,
+            'username' => $this->generateUsername($data['name']),
+            'email' => $data['email'],
+            'phone' => $data['phone'],
+            'password' => Hash::make($data['password']),
+            'status' => 1,
+        ];
+    }
+
+    protected function splitName(string $name): array
+    {
+        $nameParts = preg_split('/\s+/', trim($name)) ?: [];
+
+        $firstName = $nameParts[0] ?? 'User';
+        $lastName = count($nameParts) > 1 ? (string) end($nameParts) : $firstName;
+        $middleName = count($nameParts) > 2
+            ? implode(' ', array_slice($nameParts, 1, -1))
+            : null;
+
+        return [$firstName, $middleName, $lastName];
+    }
+
+    protected function generateUsername(string $name): string
+    {
+        $baseUsername = Str::lower(preg_replace('/[^A-Za-z0-9]+/', '', $name) ?: 'user');
+        $username = $baseUsername;
+        $counter = 1;
+
+        while (User::where('username', $username)->exists()) {
+            $username = $baseUsername.$counter;
+            $counter++;
         }
+
+        return $username;
+    }
+
+    protected function generateUserCode(): string
+    {
+        $currentYear = now()->year;
+        $latestId = (User::max('id') ?? 0) + 1;
+
+        return "Opsh-{$currentYear}-{$latestId}";
     }
 }

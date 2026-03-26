@@ -7,13 +7,20 @@ use App\Models\Property;
 use App\Models\PropertyAddress;
 use App\Models\PropertyImages;
 use App\Models\HouseDetail;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 
 class PropertyStoreService
 {
+    public function __construct(
+        private readonly AdminNotificationService $adminNotificationService,
+    ) {
+    }
+
     /**
      * Store a new property with all relationships
      *
@@ -23,6 +30,17 @@ class PropertyStoreService
     public function store(array $data): Property
     {
         return DB::transaction(function () use ($data) {
+            $currentUser = Auth::user();
+            $actorId = $currentUser?->id;
+
+            if ($actorId && empty($data['created_by'])) {
+                $data['created_by'] = $actorId;
+            }
+
+            if ($actorId) {
+                $data['updated_by'] = $actorId;
+            }
+
             // Create the property
             $property = $this->createProperty($data);
 
@@ -51,7 +69,7 @@ class PropertyStoreService
                 $this->attachNearbyPlaces($property, $data['nearby_places']);
             }
 
-            return $property->load([
+            $property = $property->load([
                  'address', 
                  'images', 
                  'nearbyPlaces',
@@ -62,6 +80,26 @@ class PropertyStoreService
                 'houseDetails.roofType',
                 'houseDetails.buildingFace'
             ]);
+
+            $propertyId = $property->id;
+
+            DB::afterCommit(function () use ($propertyId, $currentUser): void {
+                $freshProperty = Property::with([
+                    'createdBy',
+                    'propertyType',
+                    'listingType',
+                    'address',
+                ])->find($propertyId);
+
+                if ($freshProperty) {
+                    $this->adminNotificationService->notifyPropertyCreated(
+                        $freshProperty,
+                        $currentUser instanceof User ? $currentUser : null
+                    );
+                }
+            });
+
+            return $property;
         });
     }
 
@@ -75,6 +113,10 @@ class PropertyStoreService
     public function update(Property $property, array $data): Property
     {
         return DB::transaction(function () use ($property, $data) {
+            if (Auth::id()) {
+                $data['updated_by'] = Auth::id();
+            }
+
             // Update the property
             $property->update($this->extractPropertyData($data));
 
