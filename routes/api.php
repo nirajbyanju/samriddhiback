@@ -50,7 +50,7 @@ Route::prefix('v1')->group(function () {
         // Authentication routes
         Route::prefix('auth')->as('auth.')->group(function () {
             Route::post('/register', [AuthController::class, 'register'])->name('register');
-            Route::post('/admin/register', [AuthController::class, 'adminRegister'])->name('admin.register');
+            Route::post('/admin/register', [AuthController::class, 'adminRegister'])->middleware('auth:sanctum')->name('admin.register');
             Route::post('/login', [AuthController::class, 'login'])->name('login');
             Route::post('/refresh', [AuthController::class, 'refreshToken'])->name('refresh');
         });
