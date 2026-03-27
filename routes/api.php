@@ -44,9 +44,6 @@ Route::prefix('v1')->group(function () {
             Route::get('/{slug}/details', [FrontController::class, 'propertyDetail'])->name('details');
         });
 
-        // Inquiry routes
-        Route::get('/inquiries', [FrontController::class, 'getInquery'])->name('inquiries.index');
-
         // Authentication routes
         Route::prefix('auth')->as('auth.')->group(function () {
             Route::post('/register', [AuthController::class, 'register'])->name('register');
@@ -134,6 +131,8 @@ Route::prefix('v1')->group(function () {
         Route::prefix('options')->as('options.')->group(function () {
             Route::get('/', [OptionController::class, 'fetchOption'])->name('index');
             Route::post('/', [OptionController::class, 'store'])->name('store');
+            Route::get('/types', [OptionController::class, 'types'])->name('types');
+            Route::get('/catalog/{type}', [OptionController::class, 'catalog'])->name('catalog');
             Route::get('/dropdown/{slug}/{module?}', [OptionController::class, 'getDropdownOptions'])->name('dropdown');
             Route::get('/menu', [OptionController::class, 'optionMenu'])->name('menu');
             Route::get('/show', [OptionController::class, 'showOption'])->name('show');
@@ -168,13 +167,14 @@ Route::prefix('v1')->group(function () {
         });
 
         // ==================== FIELD VISITS ====================
+        Route::get('/field-visits', [FieldVisitsController::class, 'index'])->name('field-visits.global.index');
         Route::prefix('properties/{propertyId}/field-visits')->as('field-visits.')->group(function () {
             Route::get('/', [FieldVisitsController::class, 'index'])->name('index');
             Route::post('/', [FieldVisitsController::class, 'store'])->name('store');
             Route::get('/{fieldVisit}', [FieldVisitsController::class, 'show'])->name('show');
             Route::put('/{fieldVisit}', [FieldVisitsController::class, 'update'])->name('update');
-            Route::delete('/{id}', [FieldVisitsController::class, 'destroy'])->name('destroy');
-            Route::patch('/status/{id}', [FieldVisitsController::class, 'updateStatus'])->name('status.update');
+            Route::delete('/{fieldVisit}', [FieldVisitsController::class, 'destroy'])->name('destroy');
+            Route::patch('/status/{fieldVisit}', [FieldVisitsController::class, 'updateStatus'])->name('status.update');
         });
 
         // ==================== BLOG MANAGEMENT ====================

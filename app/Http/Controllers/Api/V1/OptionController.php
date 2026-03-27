@@ -232,6 +232,8 @@ class OptionController extends BaseController
 
     ];
 
+    protected array $allowedFilters = [];
+
     /**
      * Fetch options for dropdown
      */
@@ -260,6 +262,7 @@ class OptionController extends BaseController
 
         $modelConfig = $this->modelMap[$type];
         $model = $modelConfig['model'];
+        $displayField = $this->displayFieldForType($type);
 
 
 
@@ -277,9 +280,9 @@ class OptionController extends BaseController
             $query->where('is_status', $isStatus);
         }
         if ($request->filled('title')) {
-            $query->where('label', 'LIKE', '%' . $request->input('title') . '%');
+            $query->where($displayField, 'LIKE', '%' . $request->input('title') . '%');
         }
-        $query->orderBy($columns[0] ?? 'id');
+        $query->orderBy($this->defaultSortColumnForType($type));
 
         $paginatedResults = $query->paginate($limit, ['*'], 'page', $page);
 
@@ -287,6 +290,14 @@ class OptionController extends BaseController
             'success' => true,
             'message' => 'sucessfully interview list',
             'data' => $paginatedResults->items(),
+            'normalized_data' => collect($paginatedResults->items())
+                ->map(fn ($record) => $this->normalizeOptionRecord($record, $type))
+                ->values(),
+            'meta' => [
+                'type' => $type,
+                'display_field' => $displayField,
+                'default_sort' => $this->defaultSortColumnForType($type),
+            ],
             'pagination' => [
                 'total' => $paginatedResults->total(), // Total records
                 'per_page' => $paginatedResults->perPage(), // Items per page
@@ -391,16 +402,7 @@ class OptionController extends BaseController
      */
     public function showOption()
     {
-        $options = [];
-
-        foreach ($this->modelMap as $key => $config) {
-            $options[$key] = [
-                'columns' => $config['columns'],
-                'filters' => $this->allowedFilters[$key] ?? []
-            ];
-        }
-
-        return $this->sendResponse($options, 'Available options retrieved successfully');
+        return $this->sendResponse($this->availableOptionTypes(), 'Available options retrieved successfully');
     }
 
     /**
@@ -435,13 +437,14 @@ class OptionController extends BaseController
 
     public function optionMenu()
     {
-        $menuData = [];
-
-        foreach ($this->modelMap as $key => $config) {
-            $menuData[] = [
-                'name' => ucfirst($key)
-            ];
-        }
+        $menuData = collect($this->availableOptionTypes())
+            ->map(fn (array $type) => [
+                'name' => $type['label'],
+                'type' => $type['type'],
+                'display_field' => $type['display_field'],
+            ])
+            ->values()
+            ->all();
 
         return response()->json([
             'success' => true,
@@ -466,11 +469,72 @@ class OptionController extends BaseController
             return response()->json([
                 'success' => true,
                 'data' => $option,
+                'normalized' => $this->normalizeOptionRecord($option, $type),
                 'message' => 'Option has been successfully retrieved',
             ], 200);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return $this->sendError('Option not found.', null, 404);
         }
+    }
+
+    public function types()
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $this->availableOptionTypes(),
+            'message' => 'Option types retrieved successfully',
+        ]);
+    }
+
+    public function catalog(Request $request, string $type)
+    {
+        $type = strtolower($type);
+
+        if (!isset($this->modelMap[$type])) {
+            return $this->sendError('Invalid dropdown type.', null, 400);
+        }
+
+        $model = $this->modelMap[$type]['model'];
+        $displayField = $this->displayFieldForType($type);
+        $limit = is_numeric($request->get('limit')) ? (int) $request->get('limit') : 25;
+        $page = is_numeric($request->get('page')) ? (int) $request->get('page') : 1;
+
+        $query = $model::query();
+
+        if ($request->filled('search')) {
+            $query->where($displayField, 'LIKE', '%' . $request->get('search') . '%');
+        }
+
+        if ($request->filled('parent_id')) {
+            $query->where('parent_id', $request->get('parent_id'));
+        }
+
+        if ($request->filled('is_status')) {
+            $query->where('is_status', (int) $request->boolean('is_status'));
+        }
+
+        $query->orderBy($this->defaultSortColumnForType($type));
+
+        $paginatedResults = $query->paginate($limit, ['*'], 'page', $page);
+
+        return response()->json([
+            'success' => true,
+            'data' => collect($paginatedResults->items())
+                ->map(fn ($record) => $this->normalizeOptionRecord($record, $type))
+                ->values(),
+            'meta' => [
+                'type' => $type,
+                'display_field' => $displayField,
+                'default_sort' => $this->defaultSortColumnForType($type),
+            ],
+            'pagination' => [
+                'total' => $paginatedResults->total(),
+                'per_page' => $paginatedResults->perPage(),
+                'current_page' => $paginatedResults->currentPage(),
+                'last_page' => $paginatedResults->lastPage(),
+            ],
+            'message' => 'Option catalog retrieved successfully',
+        ]);
     }
 
     public function getDropdownOptions($slug, $module = null)
@@ -486,16 +550,29 @@ class OptionController extends BaseController
         $model = $modelConfig['model'];
 
         try {
-            $query = $model::select('id', 'label');
+            $query = $model::query()
+                ->orderBy($this->defaultSortColumnForType($type));
 
-
-            // Optional: Add ordering
-            $query->orderBy($columns[0] ?? 'id');
+            $items = $query->get()
+                ->map(fn ($record) => $this->normalizeOptionRecord($record, $type))
+                ->map(fn (array $record) => [
+                    'id' => $record['id'],
+                    'label' => $record['label'],
+                    'value' => $record['value'],
+                    'slug' => $record['slug'],
+                    'type' => $record['type'],
+                    'is_status' => $record['is_status'],
+                ])
+                ->values();
 
             return response()->json([
                 'success' => true,
                 'message' => 'sucessfully interview list',
-                'data' => $query->get(),
+                'data' => $items,
+                'meta' => [
+                    'type' => $type,
+                    'display_field' => $this->displayFieldForType($type),
+                ],
             ], 200);
         } catch (\Exception $e) {
             return $this->sendError('Server Error', 'Failed to fetch options', 500);
@@ -510,11 +587,12 @@ class OptionController extends BaseController
             foreach ($this->modelMap as $key => $config) {
                 $model = $config['model'];
 
-                // Get all records for this model
                 $records = $model::all();
 
-                // Transform records based on model structure
-                $allOptions[$key] = $records;
+                $allOptions[$key] = [
+                    'raw' => $records,
+                    'normalized' => $records->map(fn ($record) => $this->normalizeOptionRecord($record, $key))->values(),
+                ];
             }
 
             return response()->json([
@@ -529,5 +607,59 @@ class OptionController extends BaseController
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    private function availableOptionTypes(): array
+    {
+        return collect($this->modelMap)
+            ->map(function (array $config, string $type) {
+                return [
+                    'type' => $type,
+                    'label' => Str::headline($type),
+                    'display_field' => $this->displayFieldForType($type),
+                    'default_sort' => $this->defaultSortColumnForType($type),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function displayFieldForType(string $type): string
+    {
+        $storeRules = $this->modelMap[$type]['validation']['store'] ?? [];
+
+        if (array_key_exists('label', $storeRules)) {
+            return 'label';
+        }
+
+        if (array_key_exists('name', $storeRules)) {
+            return 'name';
+        }
+
+        return 'name';
+    }
+
+    private function defaultSortColumnForType(string $type): string
+    {
+        return $this->displayFieldForType($type);
+    }
+
+    private function normalizeOptionRecord($record, string $type): array
+    {
+        $displayField = $this->displayFieldForType($type);
+        $label = (string) data_get($record, $displayField, '');
+        $slug = data_get($record, 'slug');
+
+        return [
+            'id' => data_get($record, 'id'),
+            'label' => $label,
+            'name' => $label,
+            'value' => data_get($record, 'id'),
+            'slug' => $slug ?: Str::slug($label),
+            'type' => $type,
+            'display_field' => $displayField,
+            'is_status' => data_get($record, 'is_status'),
+            'raw' => method_exists($record, 'toArray') ? $record->toArray() : (array) $record,
+        ];
     }
 }

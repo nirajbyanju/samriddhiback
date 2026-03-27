@@ -33,6 +33,12 @@ class BlogsController extends Controller
                     }
                 }
             }
+
+            if ($request->filled('category_slug')) {
+                $query->whereHas('category', function ($categoryQuery) use ($request) {
+                    $categoryQuery->where('slug', $request->get('category_slug'));
+                });
+            }
             // $query->where('status', '3');
             // $query->where('is_status', '1');
 

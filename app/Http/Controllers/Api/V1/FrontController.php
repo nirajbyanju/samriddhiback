@@ -248,6 +248,22 @@ public function propertyList(Request $request)
             }
         }
 
+        $slugRelationFilters = [
+            'listing_type_slug' => 'listingType',
+            'property_type_slug' => 'propertyType',
+            'property_status_slug' => 'propertyStatus',
+            'property_face_slug' => 'propertyFace',
+            'property_category_slug' => 'propertyCategory',
+        ];
+
+        foreach ($slugRelationFilters as $requestKey => $relation) {
+            if ($request->filled($requestKey)) {
+                $query->whereHas($relation, function ($relationQuery) use ($request, $requestKey) {
+                    $relationQuery->where('slug', $request->get($requestKey));
+                });
+            }
+        }
+
         // ========== BOOLEAN FILTERS ==========
         
         $booleanFilters = [
