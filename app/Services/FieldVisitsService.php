@@ -17,15 +17,29 @@ class FieldVisitsService
      * @param Request $request
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
-    public function listActiveFieldVisits($request)
+    public function listActiveFieldVisits($request, ?int $propertyId = null)
     {
         // Sorting
         $orderBy = in_array(strtoupper($request->get('order_by')), ['ASC', 'DESC'])
             ? strtoupper($request->get('order_by'))
             : 'DESC';
 
-        $orderColumn = $request->get('order_column') ?? 'created_at';
-        $orderColumn = Str::snake($orderColumn);
+        $allowedSortColumns = [
+            'created_at',
+            'updated_at',
+            'date',
+            'time',
+            'name',
+            'email',
+            'phone',
+            'status',
+            'property_id',
+        ];
+
+        $requestedOrderColumn = Str::snake($request->get('order_column') ?? 'created_at');
+        $orderColumn = in_array($requestedOrderColumn, $allowedSortColumns, true)
+            ? $requestedOrderColumn
+            : 'created_at';
 
         // Pagination
         $limit = $request->get('limit');
@@ -37,7 +51,7 @@ class FieldVisitsService
         $page  = is_numeric($request->get('page')) ? (int) $request->get('page') : 1;
 
         // Allowed DB filters (snake_case)
-        $allowedFilters = ['property_id', 'status', 'name', 'email', 'phone']; // Updated for field visits
+        $allowedFilters = ['property_id', 'status', 'name', 'email', 'phone'];
 
         // Convert request inputs to snake_case
         $filters = collect($request->all())
@@ -57,6 +71,10 @@ class FieldVisitsService
             } else {
                 $query->where($field, $value);
             }
+        }
+
+        if ($propertyId !== null) {
+            $query->where('property_id', $propertyId);
         }
 
         // Apply Ordering

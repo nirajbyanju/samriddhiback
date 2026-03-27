@@ -50,7 +50,8 @@ class MenuController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $menus
+            'data' => $menus,
+            'meta' => $this->permissionContract(),
         ]);
     }
 
@@ -72,7 +73,8 @@ class MenuController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $menus
+            'data' => $menus,
+            'meta' => $this->permissionContract(),
         ]);
     }
 
@@ -88,6 +90,9 @@ class MenuController extends Controller
         return response()->json([
             'success' => true,
             'data' => $menu->load(['parent', 'children', 'creator']),
+            'meta' => array_merge($this->permissionContract(), [
+                'generated_permissions' => $this->generatedPermissionsFor($menu),
+            ]),
         ]);
     }
 
@@ -145,6 +150,7 @@ class MenuController extends Controller
             'data' => [
                 'menu' => $menu->load('parent'),
                 'generated_permissions' => $generatedPermissions,
+                'supported_actions' => MenuPermissionService::supportedActions(),
             ]
         ], 201);
     }
@@ -202,6 +208,7 @@ class MenuController extends Controller
             'data' => [
                 'menu' => $menu->fresh(['parent']),
                 'generated_permissions' => $generatedPermissions,
+                'supported_actions' => MenuPermissionService::supportedActions(),
             ]
         ]);
     }
@@ -240,6 +247,7 @@ class MenuController extends Controller
             'data' => [
                 'menu' => $menu->fresh(['parent']),
                 'generated_permissions' => $generatedPermissions,
+                'supported_actions' => MenuPermissionService::supportedActions(),
             ]
         ]);
     }
@@ -300,5 +308,35 @@ class MenuController extends Controller
             'success' => true,
             'message' => 'Menus reordered successfully'
         ]);
+    }
+
+    private function permissionContract(): array
+    {
+        return [
+            'supported_actions' => MenuPermissionService::supportedActions(),
+            'request_fields' => [
+                'name',
+                'icon',
+                'route',
+                'url',
+                'parent_id',
+                'order',
+                'is_status',
+                'permission_name',
+                'is_public',
+                'role_permissions',
+            ],
+        ];
+    }
+
+    private function generatedPermissionsFor(Menu $menu): array
+    {
+        if (empty($menu->permission_name) && (bool) $menu->is_public) {
+            return [];
+        }
+
+        return $this->menuPermissionService->permissionNamesForBase(
+            $menu->permission_name ?: $menu->name ?: "menu_{$menu->id}"
+        );
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Notifications\ApiResetPasswordNotification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
@@ -91,5 +92,10 @@ class User extends Authenticatable
     public function userDetail(): HasOne
     {
         return $this->hasOne(UserDetail::class);
+    }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new ApiResetPasswordNotification($token));
     }
 }
