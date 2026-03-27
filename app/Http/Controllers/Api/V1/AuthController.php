@@ -158,46 +158,51 @@ class AuthController extends BaseController
         $tokenModel = RefreshToken::where('token', $validated['refresh_token'])->first();
 
         if (!$tokenModel) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid or expired refresh token'
-            ], 401);
+            return $this->tokenErrorResponse(
+                'refresh_token_invalid',
+                'Invalid or expired refresh token.',
+                401
+            );
         }
 
         if ($tokenModel->isExpired()) {
             $tokenModel->delete();
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Refresh token has expired'
-            ], 401);
+            return $this->tokenErrorResponse(
+                'refresh_token_expired',
+                'Refresh token has expired.',
+                401
+            );
         }
 
         $user = $tokenModel->user;
 
         if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User not found'
-            ], 404);
+            return $this->tokenErrorResponse(
+                'user_not_found',
+                'User not found.',
+                404
+            );
         }
 
         if ((int) $user->status === 0) {
             $tokenModel->delete();
 
-            return response()->json([
-                'success' => false,
-                'message' => 'The account is inactive or disabled'
-            ], 403);
+            return $this->tokenErrorResponse(
+                'account_inactive',
+                'The account is inactive or disabled.',
+                403
+            );
         }
 
         if ($user->email_verified_at === null) {
             $tokenModel->delete();
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Email is not verified'
-            ], 403);
+            return $this->tokenErrorResponse(
+                'email_unverified',
+                'Email is not verified.',
+                403
+            );
         }
 
         DB::beginTransaction();
@@ -228,10 +233,11 @@ class AuthController extends BaseController
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Token refresh failed'
-            ], 500);
+            return $this->tokenErrorResponse(
+                'refresh_failed',
+                'Token refresh failed.',
+                500
+            );
         }
     }
     public function sendResetLinkEmail(Request $request)
@@ -499,5 +505,17 @@ class AuthController extends BaseController
         }
 
         return mb_substr($deviceName, 0, 100);
+    }
+
+    private function tokenErrorResponse(string $code, string $message, int $status): JsonResponse
+    {
+        return response()->json([
+            'success' => false,
+            'message' => $message,
+            'error' => [
+                'code' => $code,
+                'message' => $message,
+            ],
+        ], $status);
     }
 }

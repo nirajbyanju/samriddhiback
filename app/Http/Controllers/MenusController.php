@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Api\V1\BaseController;
 use App\Services\UserMenuService;
-use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 
-class MenusController extends Controller
+class MenusController extends BaseController
 {
     public function __construct(
         private readonly UserMenuService $userMenuService
@@ -17,9 +17,16 @@ class MenusController extends Controller
     {
         $user = $request->user();
         if (!$user) {
-            return response()->json(['error'=>'Unauthenticated'],401);
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated',
+            ], 401);
         }
 
-        return response()->json($this->userMenuService->getForUser($user));
+        return response()->json([
+            'success' => true,
+            'data' => $this->userMenuService->getForUser($user),
+            'message' => 'Menus retrieved successfully.',
+        ]);
     }
 }

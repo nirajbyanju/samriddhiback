@@ -27,15 +27,18 @@ class FieldVisitsController extends BaseController
         ];
     }
 
-    public function index(Request $request)
+    public function index(Request $request, ?int $propertyId = null)
     {
-        $paginatedResults = $this->fieldVisitsService->listActiveFieldVisits($request);
+        $paginatedResults = $this->fieldVisitsService->listActiveFieldVisits($request, $propertyId);
 
         if ($paginatedResults->isEmpty()) {
             return response()->json([
                 'success' => true,
-                'message' => 'No posts available',
+                'message' => 'No field visits available.',
                 'data' => [],
+                'meta' => [
+                    'scoped_property_id' => $propertyId,
+                ],
                 'pagination' => [
                     'total' => $paginatedResults->total(),
                     'per_page' => $paginatedResults->perPage(),
@@ -46,33 +49,39 @@ class FieldVisitsController extends BaseController
         }
 
         return response()->json([
-            'status' => true,
-            'message' => 'List of posts',
+            'success' => true,
+            'message' => 'Field visits retrieved successfully.',
             'data' => $paginatedResults->items(),
+            'meta' => [
+                'scoped_property_id' => $propertyId,
+            ],
             'pagination' => [
-                'total' => $paginatedResults->total(), // Total records
-                'per_page' => $paginatedResults->perPage(), // Items per page
-                'current_page' => $paginatedResults->currentPage(), // Current page 
-                'last_page' => $paginatedResults->lastPage(), // Last page number
+                'total' => $paginatedResults->total(),
+                'per_page' => $paginatedResults->perPage(),
+                'current_page' => $paginatedResults->currentPage(),
+                'last_page' => $paginatedResults->lastPage(),
             ],
         ], 200);
     }
 
-    public function store(Request $request)
+    public function store(Request $request, ?int $propertyId = null)
     {
         try {
+            $payload = $request->all();
 
-            $fieldVisit = $this->fieldVisitsService->store($request->all());
+            if ($propertyId !== null) {
+                $payload['property_id'] = $propertyId;
+            }
+
+            $fieldVisit = $this->fieldVisitsService->store($payload);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Vacancy created successfully.',
-                'data' => $fieldVisit,
-            ], Response::HTTP_CREATED); // Using constant for better readability
+                'message' => 'Field visit created successfully.',
+                'data' => $fieldVisit->load('property'),
+            ], Response::HTTP_CREATED);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
-            // This will be caught automatically by Laravel if using FormRequest
-            // But we'll handle it explicitly for clarity
             return response()->json([
                 'success' => false,
                 'message' => 'Validation error.',
@@ -86,28 +95,72 @@ class FieldVisitsController extends BaseController
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-    public function show($id)
+
+    public function show(?int $propertyId, FieldVisits $fieldVisit)
     {
-        return FieldVisits::findOrFail($id);
-    }
-    public function update(Request $request, $id)
-    {
-        $fieldVisit = FieldVisits::findOrFail($id);
-        $fieldVisit->update($request->all());
-        return $fieldVisit;
-    }
-    public function destroy($id)
-    {
-        FieldVisits::destroy($id);
-        return response()->json(['message' => 'Deleted']);
+        $fieldVisit = $this->resolveFieldVisit($fieldVisit, $propertyId);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Field visit retrieved successfully.',
+            'data' => $fieldVisit->load('property'),
+        ]);
     }
 
-    public function updateStatus($id)
+    public function update(Request $request, ?int $propertyId, FieldVisits $fieldVisit)
     {
-        $fieldVisit = FieldVisits::findOrFail($id);
-        $fieldVisit->is_status = request()->get('isStatus');
+        $fieldVisit = $this->resolveFieldVisit($fieldVisit, $propertyId);
+        $payload = $request->only($fieldVisit->getFillable());
+
+        if ($propertyId !== null) {
+            $payload['property_id'] = $propertyId;
+        }
+
+        $fieldVisit->update($payload);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Field visit updated successfully.',
+            'data' => $fieldVisit->fresh()->load('property'),
+        ]);
+    }
+
+    public function destroy(?int $propertyId, FieldVisits $fieldVisit)
+    {
+        $fieldVisit = $this->resolveFieldVisit($fieldVisit, $propertyId);
+        $fieldVisit->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Field visit deleted successfully.',
+        ]);
+    }
+
+    public function updateStatus(Request $request, ?int $propertyId, FieldVisits $fieldVisit)
+    {
+        $fieldVisit = $this->resolveFieldVisit($fieldVisit, $propertyId);
+        $validated = $request->validate([
+            'status' => 'nullable|string|in:pending,confirmed,cancelled,completed',
+        ]);
+
+        if (!array_key_exists('status', $validated)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error.',
+                'errors' => [
+                    'status' => ['The status field is required.'],
+                ],
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $fieldVisit->status = $validated['status'];
         $fieldVisit->save();
-        return $fieldVisit;
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Field visit status updated successfully.',
+            'data' => $fieldVisit->fresh()->load('property'),
+        ]);
     }
 
 
@@ -150,5 +203,17 @@ class FieldVisitsController extends BaseController
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    private function resolveFieldVisit(FieldVisits $fieldVisit, ?int $propertyId): FieldVisits
+    {
+        if ($propertyId === null) {
+            return $fieldVisit;
+        }
+
+        return FieldVisits::query()
+            ->whereKey($fieldVisit->getKey())
+            ->where('property_id', $propertyId)
+            ->firstOrFail();
     }
 }
