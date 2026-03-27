@@ -240,81 +240,164 @@ class AuthController extends BaseController
             );
         }
     }
-    public function sendResetLinkEmail(Request $request)
+    public function sendResetLinkEmail(Request $request): JsonResponse
     {
-        try {
-            $validator = Validator::make($request->all(), [
-                'email' => 'required|email',
-            ]);
+        $validated = $request->validate([
+            'email' => 'required|email',
+        ]);
 
-            if ($validator->fails()) {
-                return response()->json(['errors' => $validator->errors()], 422);
-            }
+        $user = User::where('email', $validated['email'])->first();
 
-            $user = User::where('email', $request->email)->first();
-
-            if (!$user) {
-                return response()->json(['error' => 'Email does not exist.'], 404);
-            }
-
-
-            $response = Password::sendResetLink(
-                $request->only('email')
+        if (!$user) {
+            return $this->passwordErrorResponse(
+                'email_not_found',
+                'No account found for that email address.',
+                404
             );
-
-            if ($response == Password::RESET_LINK_SENT) {
-                return response()->json(['message' => 'Reset link sent to your email.'], 200);
-            } else {
-                return response()->json(['error' => 'Unable to send reset link. Please try again later.'], 500);
-            }
-            // dispatch(new SenEmailJob($request->only('email')));
-
-            return response()->json(['message' => 'Reset link queued to be sent to your email.'], 200);
-        } catch (\Exception $e) {
-            // Return a generic error response
-            return response()->json(['error' => 'An unexpected error occurred. Please try again later.'], 500);
         }
+
+        if ((int) $user->status === 0) {
+            return $this->passwordErrorResponse(
+                'account_inactive',
+                'The account is inactive or disabled.',
+                403
+            );
+        }
+
+        $response = Password::sendResetLink([
+            'email' => $validated['email'],
+        ]);
+
+        return match ($response) {
+            Password::RESET_LINK_SENT => response()->json([
+                'success' => true,
+                'data' => [
+                    'email' => $validated['email'],
+                ],
+                'message' => 'Password reset link sent to your email.',
+            ]),
+            Password::RESET_THROTTLED => $this->passwordErrorResponse(
+                'reset_link_throttled',
+                'Please wait before requesting another password reset link.',
+                429
+            ),
+            default => $this->passwordErrorResponse(
+                'reset_link_send_failed',
+                'Unable to send password reset link. Please try again later.',
+                500
+            ),
+        };
     }
 
-    public function resetPassword(Request $request)
+    public function validateResetToken(Request $request): JsonResponse
     {
-        try {
-            // Validate the input
-            $validator = Validator::make($request->all(), [
-                'token' => 'required|string',
-                'email' => 'required|email',
-                'password' => 'required|string|min:8',
-                'cPassword' => 'required|string|same:password',
-            ]);
+        $validated = $request->validate([
+            'token' => 'required|string',
+            'email' => 'required|email',
+        ]);
 
-            if ($validator->fails()) {
-                return response()->json(['errors' => $validator->errors()], 422);
-            }
+        $user = User::where('email', $validated['email'])->first();
 
-            // Perform password reset
-            $status = Password::reset(
-                [
-                    'email' => $request->email,
-                    'password' => $request->password,
-                    'password_confirmation' => $request->cPassword,
-                    'token' => $request->token,
-                ],
-                function ($user, $password) {
-                    $user->forceFill([
-                        'password' => Hash::make($password),
-                    ])->save();
-                }
+        if (!$user) {
+            return $this->passwordErrorResponse(
+                'email_not_found',
+                'No account found for that email address.',
+                404
             );
-
-            if ($status === Password::PASSWORD_RESET) {
-                return response()->json(['message' => 'Password reset successfully.'], 200);
-            } else {
-                return response()->json(['error' => __($status)], 400);
-            }
-        } catch (\Exception $e) {
-            // Return a generic error response
-            return response()->json(['error' => 'An unexpected error occurred. Please try again later.'], 500);
         }
+
+        if (!Password::broker()->tokenExists($user, $validated['token'])) {
+            return $this->passwordErrorResponse(
+                'reset_token_invalid',
+                'Reset token is invalid or has expired.',
+                422
+            );
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'email' => $validated['email'],
+                'token_valid' => true,
+            ],
+            'message' => 'Reset token is valid.',
+        ]);
+    }
+
+    public function resetPassword(Request $request): JsonResponse
+    {
+        if ($request->filled('cPassword') && !$request->filled('password_confirmation')) {
+            $request->merge([
+                'password_confirmation' => $request->input('cPassword'),
+            ]);
+        }
+
+        $validated = $request->validate([
+            'token' => 'required|string',
+            'email' => 'required|email',
+            'password' => 'required|string|min:8|confirmed',
+            'password_confirmation' => 'required|string|same:password',
+        ]);
+
+        $user = User::where('email', $validated['email'])->first();
+
+        if (!$user) {
+            return $this->passwordErrorResponse(
+                'email_not_found',
+                'No account found for that email address.',
+                404
+            );
+        }
+
+        if (!Password::broker()->tokenExists($user, $validated['token'])) {
+            return $this->passwordErrorResponse(
+                'reset_token_invalid',
+                'Reset token is invalid or has expired.',
+                422
+            );
+        }
+
+        $status = Password::reset(
+            [
+                'email' => $validated['email'],
+                'password' => $validated['password'],
+                'password_confirmation' => $validated['password_confirmation'],
+                'token' => $validated['token'],
+            ],
+            function ($user, $password) {
+                $user->forceFill([
+                    'password' => Hash::make($password),
+                ])->save();
+
+                $user->tokens()->delete();
+                RefreshToken::where('user_id', $user->id)->delete();
+            }
+        );
+
+        return match ($status) {
+            Password::PASSWORD_RESET => response()->json([
+                'success' => true,
+                'data' => [
+                    'email' => $validated['email'],
+                ],
+                'message' => 'Password reset successfully.',
+            ]),
+            Password::INVALID_TOKEN => $this->passwordErrorResponse(
+                'reset_token_invalid',
+                'Reset token is invalid or has expired.',
+                422
+            ),
+            Password::INVALID_USER => $this->passwordErrorResponse(
+                'email_not_found',
+                'No account found for that email address.',
+                404
+            ),
+            default => $this->passwordErrorResponse(
+                'password_reset_failed',
+                'Unable to reset password. Please try again later.',
+                500
+            ),
+        };
     }
 
     public function emailVerify(Request $request)
@@ -508,6 +591,18 @@ class AuthController extends BaseController
     }
 
     private function tokenErrorResponse(string $code, string $message, int $status): JsonResponse
+    {
+        return response()->json([
+            'success' => false,
+            'message' => $message,
+            'error' => [
+                'code' => $code,
+                'message' => $message,
+            ],
+        ], $status);
+    }
+
+    private function passwordErrorResponse(string $code, string $message, int $status): JsonResponse
     {
         return response()->json([
             'success' => false,

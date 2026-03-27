@@ -54,6 +54,10 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    'frontend_url' => env('FRONTEND_URL', env('APP_URL', 'http://localhost')),
+
+    'frontend_reset_password_url' => env('FRONTEND_RESET_PASSWORD_URL'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone
