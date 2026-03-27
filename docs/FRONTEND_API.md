@@ -102,6 +102,9 @@ Or, in older auth/register responses:
 | POST | `/public/auth/admin/register` | Create admin through registration flow | Yes | Same as public register | Requires existing auth token |
 | POST | `/public/auth/login` | Login and get menu with token pair | No | `email`, `password`, optional `device_name` | Returns access token, refresh token, user, menus |
 | POST | `/public/auth/refresh` | Rotate token pair for current device/session | No | `refresh_token`, optional `device_name` | Returns new access token, refresh token, user, menus, and stable error codes on failure |
+| POST | `/public/auth/forgot-password` | Send password reset email | No | `email` | Sends reset link if account exists and is active |
+| GET | `/public/auth/reset-password/validate` | Validate reset token before showing form | No | Query: `email`, `token` | Returns `token_valid=true` when usable |
+| POST | `/public/auth/reset-password` | Save a new password from email reset flow | No | `email`, `token`, `password`, `password_confirmation` | Resets password and revokes old tokens |
 
 ### Authenticated session
 
@@ -155,6 +158,26 @@ Or, in older auth/register responses:
 - `email_unverified`
 - `user_not_found`
 - `refresh_failed`
+
+### Password reset flow
+
+1. Frontend submits `POST /public/auth/forgot-password` with user email.
+2. Backend sends a reset email using a frontend URL.
+3. The email link opens:
+   - `FRONTEND_RESET_PASSWORD_URL?token=...&email=...`
+   - or, if not set: `FRONTEND_URL/reset-password?token=...&email=...`
+4. Frontend calls `GET /public/auth/reset-password/validate`.
+5. If valid, frontend shows the new-password form.
+6. Frontend submits `POST /public/auth/reset-password`.
+
+### Password reset error codes
+
+- `email_not_found`
+- `account_inactive`
+- `reset_link_throttled`
+- `reset_link_send_failed`
+- `reset_token_invalid`
+- `password_reset_failed`
 
 ## 5. Current User APIs
 

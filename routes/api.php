@@ -50,6 +50,9 @@ Route::prefix('v1')->group(function () {
             Route::post('/admin/register', [AuthController::class, 'adminRegister'])->middleware('auth:sanctum')->name('admin.register');
             Route::post('/login', [AuthController::class, 'login'])->name('login');
             Route::post('/refresh', [AuthController::class, 'refreshToken'])->name('refresh');
+            Route::post('/forgot-password', [AuthController::class, 'sendResetLinkEmail'])->name('password.email');
+            Route::get('/reset-password/validate', [AuthController::class, 'validateResetToken'])->name('password.validate');
+            Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.reset');
         });
 
         // Options
