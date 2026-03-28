@@ -40,6 +40,7 @@ Route::prefix('v1')->group(function () {
         // Property routes
         Route::prefix('properties')->as('properties.')->group(function () {
             Route::get('/summary', [FrontController::class, 'propertySummary'])->name('summary');
+            Route::get('/summarymobile', [FrontController::class, 'propertySummary']);
             Route::get('/list', [FrontController::class, 'propertyList'])->name('list');
             Route::get('/{slug}/details', [FrontController::class, 'propertyDetail'])->name('details');
         });
