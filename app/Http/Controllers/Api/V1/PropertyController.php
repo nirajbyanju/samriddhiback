@@ -56,7 +56,7 @@ class PropertyController extends BaseController  implements HasMiddleware
     public function store(Request $request)
     {
         try {
-            $property = $this->propertyStoreService->store($request->all());
+            $property = $this->propertyStoreService->store($this->preparePayload($request));
 
             return response()->json([
                 'success' => true,
@@ -100,7 +100,7 @@ class PropertyController extends BaseController  implements HasMiddleware
 
     public function update(Request $request, Property $property)
     {
-        $property = $this->propertyStoreService->update($property, $request->all());
+        $property = $this->propertyStoreService->update($property, $this->preparePayload($request));
 
         return response()->json([
             'success' => true,
@@ -134,5 +134,66 @@ class PropertyController extends BaseController  implements HasMiddleware
             'message' => 'Property status updated successfully.',
             'data' => $property,
         ]);
+    }
+
+    private function preparePayload(Request $request): array
+    {
+        $payload = $this->normalizePayload($request->all());
+
+        foreach ([
+            'base_price',
+            'advertise_price',
+            'land_area',
+            'length',
+            'height',
+            'road_width',
+            'built_area',
+            'parking_area',
+        ] as $field) {
+            if ($request->has($field)) {
+                $payload[$field] = $request->input($field);
+            }
+        }
+
+        if ($request->has('construction_status_id')) {
+            $payload['construction_status'] = $request->input('construction_status_id');
+        }
+
+        return $payload;
+    }
+
+    private function normalizePayload(mixed $value): mixed
+    {
+        if (is_array($value)) {
+            $normalized = [];
+
+            foreach ($value as $key => $item) {
+                $normalized[$key] = $this->normalizePayload($item);
+            }
+
+            return $normalized;
+        }
+
+        if (!is_string($value)) {
+            return $value;
+        }
+
+        $trimmed = trim($value);
+
+        if ($trimmed === 'null') {
+            return null;
+        }
+
+        if ($trimmed === '') {
+            return $value;
+        }
+
+        $decoded = json_decode($trimmed, true);
+
+        if (json_last_error() === JSON_ERROR_NONE && (is_array($decoded) || is_object($decoded) || $decoded === null)) {
+            return $this->normalizePayload($decoded);
+        }
+
+        return $value;
     }
 }

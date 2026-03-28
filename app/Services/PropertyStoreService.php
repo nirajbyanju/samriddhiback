@@ -118,7 +118,7 @@ class PropertyStoreService
             }
 
             // Update the property
-            $property->update($this->extractPropertyData($data));
+            $property->update($this->extractPropertyData($data, true));
 
             // Update or create house details if property is house
             if ($this->isHouseProperty($property)) {
@@ -207,18 +207,21 @@ class PropertyStoreService
         $houseData['property_id'] = $property->id;
 
         // Process floor details if provided
-        if (isset($houseData['floor_details']) && is_array($houseData['floor_details'])) {
-            $houseData['floor_details'] = $this->processFloorDetails($houseData['floor_details']);
+        if (array_key_exists('floor_details', $houseData)) {
+            $houseData['floor_details'] = $this->normalizeFloorDetails($houseData['floor_details']);
         }
 
-        // Process construction status details if provided
-        if (isset($houseData['construction_status']) && is_array($houseData['construction_status'])) {
-            $houseData['construction_status'] = json_encode($houseData['construction_status']);
+        if (array_key_exists('construction_status', $houseData)) {
+            $houseData['construction_status'] = $this->normalizeConstructionStatus($houseData['construction_status']);
+        }
+
+        if (array_key_exists('construction_status_details', $houseData)) {
+            $houseData['construction_status_details'] = $this->normalizeArrayValue($houseData['construction_status_details']);
         }
 
         // Process amenities if provided
-        if (isset($houseData['amenities']) && is_array($houseData['amenities'])) {
-            $houseData['amenities'] = json_encode($houseData['amenities']);
+        if (array_key_exists('amenities', $houseData)) {
+            $houseData['amenities'] = $this->normalizeArrayValue($houseData['amenities']);
         }
 
         return HouseDetail::create($houseData);
@@ -229,21 +232,33 @@ class PropertyStoreService
      */
     protected function updateOrCreateHouseDetails(Property $property, array $data): HouseDetail
     {
-        $houseData = $this->extractHouseDetailsData($data);
+        $houseData = $this->extractHouseDetailsData($data, true);
+
+        if (Auth::id()) {
+            $houseData['updated_by'] = Auth::id();
+        }
 
         // Process floor details if provided
-        if (isset($houseData['floor_details']) && is_array($houseData['floor_details'])) {
-            $houseData['floor_details'] = $this->processFloorDetails($houseData['floor_details']);
+        if (array_key_exists('floor_details', $houseData)) {
+            $houseData['floor_details'] = $this->normalizeFloorDetails($houseData['floor_details']);
+        }
+
+        if (array_key_exists('construction_status', $houseData)) {
+            if ($this->isInvalidJsObjectString($houseData['construction_status'])) {
+                unset($houseData['construction_status']);
+            } else {
+                $houseData['construction_status'] = $this->normalizeConstructionStatus($houseData['construction_status']);
+            }
         }
 
         // Process construction status details if provided
-        if (isset($houseData['construction_status_details']) && is_array($houseData['construction_status_details'])) {
-            $houseData['construction_status_details'] = json_encode($houseData['construction_status_details']);
+        if (array_key_exists('construction_status_details', $houseData)) {
+            $houseData['construction_status_details'] = $this->normalizeArrayValue($houseData['construction_status_details']);
         }
 
         // Process amenities if provided
-        if (isset($houseData['amenities']) && is_array($houseData['amenities'])) {
-            $houseData['amenities'] = json_encode($houseData['amenities']);
+        if (array_key_exists('amenities', $houseData)) {
+            $houseData['amenities'] = $this->normalizeArrayValue($houseData['amenities']);
         }
 
         return $property->houseDetails()->updateOrCreate(
@@ -255,7 +270,7 @@ class PropertyStoreService
     /**
      * Process floor details to ensure proper format
      */
-    protected function processFloorDetails(array $floorDetails): string
+    protected function processFloorDetails(array $floorDetails): array
     {
         $processed = [];
 
@@ -269,7 +284,7 @@ class PropertyStoreService
             ];
         }
 
-        return json_encode($processed);
+        return $processed;
     }
 
     /**
@@ -446,7 +461,7 @@ class PropertyStoreService
     /**
      * Extract house details data from request
      */
-    protected function extractHouseDetailsData(array $data): array
+    protected function extractHouseDetailsData(array $data, bool $preserveNulls = false): array
     {
         $houseFields = [
             'furnishing_id',
@@ -471,8 +486,14 @@ class PropertyStoreService
             'building_face_id'
         ];
 
+        $houseData = array_intersect_key($data, array_flip($houseFields));
+
+        if ($preserveNulls) {
+            return $houseData;
+        }
+
         return array_filter(
-            array_intersect_key($data, array_flip($houseFields)),
+            $houseData,
             fn($value) => !is_null($value) && $value !== ''
         );
     }
@@ -480,7 +501,7 @@ class PropertyStoreService
     /**
      * Extract property data from request
      */
-    protected function extractPropertyData(array $data): array
+    protected function extractPropertyData(array $data, bool $preserveNulls = false): array
     {
         $propertyFields = [
             'property_code',
@@ -519,8 +540,14 @@ class PropertyStoreService
             'video_url',
         ];
 
+        $propertyData = array_intersect_key($data, array_flip($propertyFields));
+
+        if ($preserveNulls) {
+            return $propertyData;
+        }
+
         return array_filter(
-            array_intersect_key($data, array_flip($propertyFields)),
+            $propertyData,
             fn($value) => !is_null($value)
         );
     }
@@ -528,7 +555,7 @@ class PropertyStoreService
     /**
      * Extract address data from request
      */
-    protected function extractAddressData(array $data): array
+    protected function extractAddressData(array $data, bool $preserveNulls = false): array
     {
         $addressFields = [
             'province_id',
@@ -542,8 +569,14 @@ class PropertyStoreService
             'longitude'
         ];
 
+        $addressData = array_intersect_key($data, array_flip($addressFields));
+
+        if ($preserveNulls) {
+            return $addressData;
+        }
+
         return array_filter(
-            array_intersect_key($data, array_flip($addressFields)),
+            $addressData,
             fn($value) => !is_null($value) && $value !== ''
         );
     }
@@ -562,6 +595,70 @@ class PropertyStoreService
         }
 
         return false;
+    }
+
+    protected function normalizeFloorDetails(mixed $value): ?array
+    {
+        $decoded = $this->normalizeArrayValue($value);
+
+        if (!is_array($decoded)) {
+            return null;
+        }
+
+        return $this->processFloorDetails($decoded);
+    }
+
+    protected function normalizeConstructionStatus(mixed $value): ?int
+    {
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+
+        if (is_array($value)) {
+            $candidate = $value['id'] ?? $value['value'] ?? null;
+
+            return is_numeric($candidate) ? (int) $candidate : null;
+        }
+
+        if (is_string($value)) {
+            $trimmed = trim($value);
+
+            if ($trimmed === '' || $trimmed === '[object Object]' || strtolower($trimmed) === 'null') {
+                return null;
+            }
+
+            $decoded = json_decode($trimmed, true);
+
+            if (json_last_error() === JSON_ERROR_NONE) {
+                return $this->normalizeConstructionStatus($decoded);
+            }
+        }
+
+        return null;
+    }
+
+    protected function normalizeArrayValue(mixed $value): mixed
+    {
+        if (is_string($value)) {
+            $trimmed = trim($value);
+
+            if ($trimmed === '' || strtolower($trimmed) === 'null') {
+                return null;
+            }
+
+            $decoded = json_decode($trimmed, true);
+
+            if (json_last_error() === JSON_ERROR_NONE) {
+                return $decoded;
+            }
+        }
+
+        return $value;
+    }
+
+    protected function isInvalidJsObjectString(mixed $value): bool
+    {
+        return is_string($value) && trim($value) === '[object Object]';
     }
 
     /**

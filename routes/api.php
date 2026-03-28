@@ -150,6 +150,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/', [PropertyController::class, 'index'])->name('index');
             Route::post('/', [PropertyController::class, 'store'])->name('store');
             Route::get('/{property:id}', [PropertyController::class, 'show'])->name('show');
+            Route::post('/{property:id}', [PropertyController::class, 'update'])->name('update.post');
             Route::match(['put', 'patch'], '/{property:id}', [PropertyController::class, 'update'])->name('update');
             Route::delete('/{property:id}', [PropertyController::class, 'destroy'])->name('destroy');
             Route::patch('/{property:id}/status', [PropertyController::class, 'updateStatus'])->name('status.update');
