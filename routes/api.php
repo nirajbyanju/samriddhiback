@@ -171,7 +171,7 @@ Route::prefix('v1')->group(function () {
 
         // ==================== FIELD VISITS ====================
         Route::get('/field-visits', [FieldVisitsController::class, 'index'])->name('field-visits.global.index');
-        Route::prefix('properties/{propertyId}/field-visits')->as('field-visits.')->group(function () {
+        Route::prefix('field-visits')->as('field-visits.')->group(function () {
             Route::get('/', [FieldVisitsController::class, 'index'])->name('index');
             Route::post('/', [FieldVisitsController::class, 'store'])->name('store');
             Route::get('/{fieldVisit}', [FieldVisitsController::class, 'show'])->name('show');
